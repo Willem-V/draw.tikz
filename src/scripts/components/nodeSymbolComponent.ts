@@ -23,6 +23,7 @@ import {
 	SymbolOption,
 	TikzNodeCommand,
 	Variant,
+	variantSymbol,
 } from "../internal"
 import { selectedBoxWidth } from "../utils/selectionHelper"
 
@@ -125,7 +126,7 @@ export class NodeSymbolComponent extends NodeComponent {
 		this.size = new SVG.Point(this.componentVariant.viewBox.w, this.componentVariant.viewBox.h)
 		this.defaultTextPosition = this.componentVariant.textPosition.point.add(this.componentVariant.mid)
 
-		this.componentVisualization = CanvasController.instance.canvas.use(this.componentVariant.symbol)
+		this.componentVisualization = CanvasController.instance.canvas.use(variantSymbol(this.componentVariant))
 		this.componentVisualization.fill("none")
 		this.componentVisualization.stroke(defaultStroke)
 		this.componentVisualization.node.style.color = defaultStroke
@@ -194,7 +195,7 @@ export class NodeSymbolComponent extends NodeComponent {
 	protected updateOptions() {
 		this.componentVariant = this.referenceSymbol.getVariant(this.optionsFromProperties())
 		this.referencePosition = this.componentVariant.mid
-		this.componentVisualization.node.setAttribute("href", "#" + this.componentVariant.symbol.id())
+		this.componentVisualization.node.setAttribute("href", "#" + variantSymbol(this.componentVariant).id())
 		this.size = new SVG.Point(this.componentVariant.viewBox.w, this.componentVariant.viewBox.h)
 		this.defaultTextPosition = this.componentVariant.textPosition.point.add(this.componentVariant.mid)
 
@@ -212,6 +213,12 @@ export class NodeSymbolComponent extends NodeComponent {
 	}
 
 	public update() {
+		// the symbol can change with the global transistor arrow position
+		const symbolHref = "#" + variantSymbol(this.componentVariant).id()
+		if (this.componentVisualization.node.getAttribute("href") != symbolHref) {
+			this.componentVisualization.node.setAttribute("href", symbolHref)
+		}
+
 		let m = this.getTransformMatrix()
 		this.componentVisualization.transform(m)
 		this._bbox = this.componentVariant.viewBox.transform(m)

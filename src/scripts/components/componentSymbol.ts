@@ -1,6 +1,6 @@
 import * as SVG from "@svgdotjs/svg.js"
 import { ensureInPx } from "../utils/impSVGNumber"
-import { CanvasController } from "../internal"
+import { CanvasController, EnvironmentVariableController } from "../internal"
 
 /**
  * a point where one can snap to relative to the component position
@@ -30,10 +30,27 @@ export type Variant = {
 	viewBox: SVG.Box
 	options: SymbolOption[]
 	symbol: SVG.Symbol
+	/**
+	 * the symbol drawn with \ctikzset{transistors/arrow pos=end}, if it differs from the default symbol (see scripts/generateArrowEndSymbols.py)
+	 */
+	symbolArrowEnd?: SVG.Symbol
 	pins: TikZAnchor[]
 	textPosition: TikZAnchor
 	defaultAnchor: TikZAnchor
 	maxStroke: number
+}
+
+/**
+ * the symbol which should be used for the variant, depending on the global transistor arrow position
+ */
+export function variantSymbol(variant: Variant): SVG.Symbol {
+	if (
+		variant.symbolArrowEnd &&
+		EnvironmentVariableController.instance.getGlobalSettings().transistorArrows == "end"
+	) {
+		return variant.symbolArrowEnd
+	}
+	return variant.symbol
 }
 
 /**
@@ -181,6 +198,12 @@ export class ComponentSymbol extends SVG.Symbol {
 			clickElement.fill("transparent").stroke("none").addClass("clickBackground")
 
 			symbol.add(clickElement)
+
+			const arrowEndElement = componentMetadata.ownerDocument.getElementById(symbolID + "_arrowend")
+			if (arrowEndElement) {
+				variantObject.symbolArrowEnd = new SVG.Symbol(arrowEndElement)
+				variantObject.symbolArrowEnd.add(clickElement.clone())
+			}
 
 			this._mapping.set(this.optionsToStringArray(symbolOptions).join(", "), variantObject)
 		}

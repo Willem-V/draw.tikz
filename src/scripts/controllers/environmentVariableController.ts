@@ -23,6 +23,7 @@ type OptionsChoice =
 	// | "logic"
 	| "voltageConvention"
 	| "labelOrientation"
+	| "transistorArrows"
 
 type GlobalOption = {
 	key: OptionsChoice
@@ -110,6 +111,16 @@ const labelOrientationOption: GlobalOption = {
 	],
 }
 
+const transistorArrowOption: GlobalOption = {
+	key: "transistorArrows",
+	name: "Transistor Arrow Position",
+	tikz: "ctikzset",
+	choices: [
+		{ key: "legacy", name: "Arrows in the Middle of the Terminal", tikz: "transistors/arrow pos=legacy" },
+		{ key: "end", name: "Arrows at the End of the Terminal", tikz: "transistors/arrow pos=end" },
+	],
+}
+
 const STYLE_PRESETS: Record<StylePreset, Partial<Record<OptionsChoice, string>>> = {
 	default: {
 		voltages: "european",
@@ -119,6 +130,7 @@ const STYLE_PRESETS: Record<StylePreset, Partial<Record<OptionsChoice, string>>>
 		// logic: "american",
 		voltageConvention: "noold",
 		labelOrientation: "smart",
+		transistorArrows: "legacy",
 	},
 	american: {
 		// currents: "american",
@@ -164,6 +176,7 @@ export class EnvironmentVariableController {
 			// logicOption,
 			voltageConventionOption,
 			labelOrientationOption,
+			transistorArrowOption,
 		]
 
 		let defaults = STYLE_PRESETS["default"]
