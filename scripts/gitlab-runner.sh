@@ -19,12 +19,47 @@ install_runner() {
 		return
 	fi
 	echo "Installing gitlab-runner..."
-	curl -fsSL "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh" | sudo bash
-	sudo apt-get install -y gitlab-runner
+	if command -v apt-get >/dev/null; then
+		curl -fsSL "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh" | sudo bash
+		sudo apt-get install -y gitlab-runner
+		return
+	fi
+	if command -v dnf >/dev/null; then
+		if curl -fsSL "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.rpm.sh" | sudo bash &&
+			sudo dnf install -y gitlab-runner; then
+			return
+		fi
+		echo "No gitlab-runner package for this Fedora version, installing the official binary instead."
+	fi
+	# the official binary, installed as a systemd service
+	sudo curl -fL --output /usr/local/bin/gitlab-runner \
+		"https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64"
+	sudo chmod +x /usr/local/bin/gitlab-runner
+	if ! id gitlab-runner >/dev/null 2>&1; then
+		sudo useradd --comment "GitLab Runner" --create-home --shell /bin/bash gitlab-runner
+	fi
+	sudo /usr/local/bin/gitlab-runner install --user=gitlab-runner --working-directory=/home/gitlab-runner
+}
+
+# sudo with the full path: sudo's PATH on Fedora does not include /usr/local/bin
+runner() {
+	sudo "$(command -v gitlab-runner)" "$@"
+}
+
+ensure_docker() {
+	if sudo docker info >/dev/null 2>&1; then
+		return
+	fi
+	echo "Starting Docker..."
+	sudo systemctl enable --now docker
+	if ! sudo docker info >/dev/null 2>&1; then
+		echo "Docker could not be started, but the runner uses the Docker executor." >&2
+		exit 1
+	fi
 }
 
 is_registered() {
-	sudo gitlab-runner list 2>&1 | grep -q "$GITLAB_URL"
+	runner list 2>&1 | grep -q "$GITLAB_URL"
 }
 
 register_runner() {
@@ -32,16 +67,12 @@ register_runner() {
 		echo "A runner for $GITLAB_URL is already registered."
 		return
 	fi
-	if ! docker info >/dev/null 2>&1; then
-		echo "Docker is not running, but the runner uses the Docker executor. Start Docker first." >&2
-		exit 1
-	fi
 	local token="${GITLAB_RUNNER_TOKEN:-}"
 	if [ -z "$token" ]; then
 		read -r -s -p "Runner authentication token (glrt-...): " token
 		echo
 	fi
-	sudo gitlab-runner register --non-interactive \
+	runner register --non-interactive \
 		--url "$GITLAB_URL" \
 		--token "$token" \
 		--name "$RUNNER_NAME" \
@@ -52,17 +83,18 @@ register_runner() {
 case "${1:-start}" in
 	start)
 		install_runner
+		ensure_docker
 		register_runner
-		sudo gitlab-runner start
-		sudo gitlab-runner status
+		runner start
+		runner status
 		echo "Runner started. Re-run the pipeline in GitLab (Build > Pipelines > Run pipeline) or push to main."
 		;;
 	status)
-		sudo gitlab-runner list
-		sudo gitlab-runner status
+		runner list
+		runner status
 		;;
 	stop)
-		sudo gitlab-runner stop
+		runner stop
 		;;
 	*)
 		echo "usage: $0 [start | status | stop]" >&2
