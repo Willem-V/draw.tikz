@@ -22,7 +22,7 @@ import {
 	TikzNodeCommand,
 	RadioButtonProperty,
 } from "../internal"
-import { rectRectIntersection, roundTikz } from "../utils/selectionHelper"
+import { pointInsideRect, rectRectIntersection, roundTikz, selectionSize } from "../utils/selectionHelper"
 
 export type RectangleSaveObject = ShapeSaveObject & {
 	text?: Text
@@ -247,18 +247,65 @@ export class RectangleComponent extends ShapeComponent {
 		}
 	}
 
+	/**
+	 * an unfilled rectangle without text is only a frame: it should only be grabbed/selected at its border and not in its empty interior. Otherwise components inside the frame can't be clicked and clicking inside it can't deselect it
+	 */
+	private isFrameOnly(): boolean {
+		const unfilled = this.fillInfo.color == "default" || this.fillInfo.opacity == 0
+		return unfilled && !this.createAsText && !this.textAreaProperty.value
+	}
+
 	public isInsideSelectionRectangle(selectionRectangle: SVG.Box): boolean {
-		const rect = new SVG.Box(
-			this.position.x - this.size.x / 2,
-			this.position.y - this.size.y / 2,
-			this.size.x,
-			this.size.y
+		if (!this.isFrameOnly()) {
+			const rect = new SVG.Box(
+				this.position.x - this.size.x / 2,
+				this.position.y - this.size.y / 2,
+				this.size.x,
+				this.size.y
+			)
+			return rectRectIntersection(rect, selectionRectangle, this.rotationDeg)
+		}
+
+		// the selection has to touch the border (with some tolerance), i.e. intersect the enlarged rectangle without lying completely inside the shrunk rectangle
+		const tolerance = selectionSize / 2
+		const outer = new SVG.Box(
+			this.position.x - this.size.x / 2 - tolerance,
+			this.position.y - this.size.y / 2 - tolerance,
+			this.size.x + 2 * tolerance,
+			this.size.y + 2 * tolerance
 		)
-		return rectRectIntersection(rect, selectionRectangle, this.rotationDeg)
+		if (!rectRectIntersection(outer, selectionRectangle, this.rotationDeg)) {
+			return false
+		}
+		const innerSize = this.size.sub(new SVG.Point(2 * tolerance, 2 * tolerance))
+		if (innerSize.x <= 0 || innerSize.y <= 0) {
+			return true
+		}
+		const inner = new SVG.Box(
+			this.position.x - innerSize.x / 2,
+			this.position.y - innerSize.y / 2,
+			innerSize.x,
+			innerSize.y
+		)
+		const selectionCorners = [
+			new SVG.Point(selectionRectangle.x, selectionRectangle.y),
+			new SVG.Point(selectionRectangle.x2, selectionRectangle.y),
+			new SVG.Point(selectionRectangle.x2, selectionRectangle.y2),
+			new SVG.Point(selectionRectangle.x, selectionRectangle.y2),
+		]
+		return !selectionCorners.every((corner) =>
+			pointInsideRect(corner.rotate(-this.rotationDeg, this.position), inner)
+		)
 	}
 
 	public update(): void {
 		super.update()
+		// a frame can only be grabbed at its border, otherwise the whole area can be grabbed
+		if (this.isFrameOnly()) {
+			this.dragElement.attr({ fill: "none", stroke: "transparent", "stroke-width": selectionSize })
+		} else {
+			this.dragElement.attr({ fill: "transparent", stroke: "none" })
+		}
 		this.updateText()
 	}
 
