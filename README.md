@@ -1,10 +1,11 @@
 # CircuiTi*k*Z-Designer
 
 ## Todos
-- Turn axis off
 - why not always save in .tikz? why is json needed?
 - save groups of own components
 - Import external Tikz files if possible
+- Customizable saving: choose a project folder where the .json and .tikz are autosaved automatically (easier to retrieve, no loss when browser storage is overwritten)
+- Rectangle "array" switch: draw extra offset lines at the top and right so it looks like stacked rectangles (array of components)
 
 An interactive, visual, online editor for creating electrical circuit diagrams for LaTeX/CircuiTi*k*Z with ease. Try it out [online](https://circuit2tikz.tf.fau.de/designer/)!
 
