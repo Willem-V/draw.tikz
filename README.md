@@ -2,13 +2,13 @@
 
 An interactive, visual editor for creating electrical circuit diagrams for LaTeX/CircuiTi*k*Z with ease.
 
-**Use it online: <https://draw-tikz-6714ec.pages.esat.kuleuven.cloud/>** (log in with your ESAT GitLab account)
+**Use it online: <https://micas.pages.esat.kuleuven.cloud/>** (log in with your ESAT GitLab account)
 
 draw.tikz is a fork of [CircuiTi*k*Z-Designer](https://github.com/Circuit2TikZ/CircuiTikZ-Designer) by Manuel Kirzinger, Philipp Wiedemann and Christof Pfannenmüller (FAU), licensed under [GPL-3.0](LICENSE). The goal is to extend it step by step towards a general GUI for Ti*k*Z drawings.
 
 ## Todos
 
-- why not always save in .tikz? why is json needed?
+- why not always save in .tikz? why is json needed? -> put 
 - save groups of own components
 - Import external Tikz files if possible
 - Customizable saving: choose a project folder where the .json and .tikz are autosaved automatically (easier to retrieve, no loss when browser storage is overwritten)
@@ -58,16 +58,12 @@ All controls of the application are explained in the help menu in the top right 
 
 Drawings are stored in the browser (per address). Save your drawing regularly as a JSON file (Ctrl/⌘ + S) to be safe.
 
-## Use locally
+## Use locally (For debugging for example)
 
 1. Have [Node.js](https://nodejs.org/) (v20) installed
 2. Clone the repository
 3. Run `npm ci` in the project directory
-
-There are two ways to run it:
-
-- **Stable copy for making drawings:** `scripts/stable.sh serve` serves a built copy of the `stable` branch on <http://localhost:8080>. It only changes when you release a new version with `scripts/stable.sh release [ref]` (fast-forwards `stable` to `ref`, default `main`, and rebuilds). The stable copy lives in the git worktree `../CircuiTikZ-Designer-stable`.
-- **Development server:** `npm start` serves the working tree on <http://localhost:1234> and reloads on every change. Don't make drawings here: a reload during development can overwrite the drawing stored in the browser.
+4. `npm start` serves the working tree on <http://localhost:1234> and reloads on every change. 
 
 ## Hosting (GitLab Pages)
 

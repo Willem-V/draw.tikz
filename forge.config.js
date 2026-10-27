@@ -3,8 +3,8 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
 module.exports = {
   packagerConfig: {
-    "name": "circutikz-pwa",
-    "productName": "circuitikz designer",
+    "name": "draw.tikz",
+    "productName": "draw.tikz",
     "icon": "./src/icons/android-icon-192x192.ico",
     "out": "./build/",
     "asar": true,

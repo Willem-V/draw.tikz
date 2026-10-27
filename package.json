@@ -1,8 +1,8 @@
 {
-	"name": "circutikz-designer",
-	"version": "0.8.2",
+	"name": "draw.tikz",
+	"version": "0.1.0",
 	"private": "true",
-	"description": "An interactive, visual, online editor for creating electrical circuit diagrams for LaTeX/CircuiTikZ with ease.",
+	"description": "An interactive, visual editor for creating TikZ drawings for LaTeX.",
 	"license": "GPL-3.0-only",
 	"author": "Manuel Kirzinger",
 	"contributors": [

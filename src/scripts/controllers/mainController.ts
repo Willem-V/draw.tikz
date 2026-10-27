@@ -142,7 +142,7 @@ export class MainController {
 		MainController.appVersion = version
 		document.addEventListener("DOMContentLoaded", () => {
 			for (const element of document.getElementsByClassName("version")) {
-				element.textContent = "v" + version
+				element.textContent = "v" + version.replace(/\.0$/, "")
 			}
 		})
 

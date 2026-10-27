@@ -5,9 +5,14 @@
 // Bootstrap
 // preset bootstrap (scss) variables:
 // scss-docs-start theme-color-variables
-$primary: #2f586e; // #204251;
+// MICAS / KU Leuven palette (micas.esat.kuleuven.be)
+$primary: #00407a;
 //$secondary: #2f586e;
-$primary-bg-subtle: #d3dde6;
+$primary-bg-subtle: #ccd9e4;
+$info: #54bceb;
+$body-bg-dark: #1b2531;
+$body-secondary-bg-dark: #222f3e;
+$body-tertiary-bg-dark: #1f2a37;
 //$success: #7BB725;
 $danger: #c50f3c;
 
@@ -134,3 +139,23 @@ body {
 @import "exportModal.scss";
 @import "saveModal.scss";
 @import "properties.scss";
+
+.brand-logo {
+	height: 1.75rem;
+	opacity: 0.75;
+	transition: opacity 0.15s;
+
+	a:hover > & {
+		opacity: 1;
+	}
+}
+
+[data-bs-theme="light"] .brand-logo {
+	filter: invert(1);
+}
+
+.brand-title {
+	font-size: 1.6rem;
+	font-weight: 500;
+	vertical-align: middle;
+}
