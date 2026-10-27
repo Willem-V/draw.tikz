@@ -107,7 +107,7 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 	private isBattery: boolean = false
 
 	/**
-	 * only available for current sources: draws a diagonal arrow over the symbol to mark it as variable
+	 * only available for sources: draws a diagonal arrow over the symbol to mark it as variable
 	 */
 	private variable: BooleanProperty
 	private variableArrow: SVG.G
@@ -163,7 +163,8 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 		this.properties.add(PropertyCategories.options, this.poleStart)
 		this.properties.add(PropertyCategories.options, this.poleEnd)
 
-		const canBeVariable = symbol.source == "isCurrent"
+		// all voltage and current sources (incl. batteries) can be marked as variable
+		const canBeVariable = !!symbol.source
 		if (symbol.possibleOptions.length > 0 || symbol.possibleEnumOptions.length > 0 || canBeVariable) {
 			this.properties.add(
 				PropertyCategories.options,
