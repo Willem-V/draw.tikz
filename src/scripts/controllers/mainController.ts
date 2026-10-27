@@ -53,6 +53,7 @@ export type MessageData = {
 
 export type CanvasSettings = {
 	gridVisible?: boolean
+	axesVisible?: boolean
 	majorGridSizecm?: number
 	majorGridSubdivisions?: number
 	viewBox?: SVG.Box
@@ -655,6 +656,7 @@ export class MainController {
 			data.data = Undo.getCurrentState()
 			if (data.data.components.length > 0) {
 				data.settings.gridVisible = CanvasController.instance.gridVisible
+				data.settings.axesVisible = CanvasController.instance.axesVisible
 				data.settings.majorGridSizecm = CanvasController.instance.majorGridSizecm
 				data.settings.majorGridSubdivisions = CanvasController.instance.majorGridSubdivisions
 				data.settings.viewBox = CanvasController.instance.canvas.viewbox()

@@ -58,6 +58,7 @@ export class CanvasController {
 	 */
 	public majorGridSubdivisions = 4
 	public gridVisible = true
+	public axesVisible = true
 
 	/**
 	 * Needed for window size changes to reconstruct the old zoom level.
@@ -178,13 +179,15 @@ export class CanvasController {
 
 		gridVisibleToggle.addEventListener("change", (ev) => {
 			this.gridVisible = gridVisibleToggle.checked
-			if (this.gridVisible) {
-				if (this.paper.hasClass("d-none")) {
-					this.paper.removeClass("d-none")
-				}
-			} else {
-				this.paper.addClass("d-none")
-			}
+			this.paper.node.classList.toggle("d-none", !this.gridVisible)
+		})
+
+		let axesVisibleToggle = document.getElementById("axesVisible") as HTMLInputElement
+		axesVisibleToggle.checked = this.axesVisible
+		axesVisibleToggle.addEventListener("change", (ev) => {
+			this.axesVisible = axesVisibleToggle.checked
+			this.xAxis.node.classList.toggle("d-none", !this.axesVisible)
+			this.yAxis.node.classList.toggle("d-none", !this.axesVisible)
 		})
 	}
 
@@ -192,12 +195,16 @@ export class CanvasController {
 		this.majorGridSizecm = settings.majorGridSizecm || this.majorGridSizecm
 		this.majorGridSubdivisions = settings.majorGridSubdivisions || this.majorGridSubdivisions
 		PropertyController.instance.setSliderValues(this.majorGridSizecm, this.majorGridSubdivisions)
-		this.gridVisible = settings.gridVisible || this.gridVisible
+		this.gridVisible = settings.gridVisible ?? this.gridVisible
 		let gridVisibleToggle = document.getElementById("gridVisible") as HTMLInputElement
 		gridVisibleToggle.checked = this.gridVisible
-		if (!this.gridVisible) {
-			this.paper.addClass("d-none")
-		}
+		this.paper.node.classList.toggle("d-none", !this.gridVisible)
+
+		this.axesVisible = settings.axesVisible ?? this.axesVisible
+		let axesVisibleToggle = document.getElementById("axesVisible") as HTMLInputElement
+		axesVisibleToggle.checked = this.axesVisible
+		this.xAxis.node.classList.toggle("d-none", !this.axesVisible)
+		this.yAxis.node.classList.toggle("d-none", !this.axesVisible)
 		if (settings.viewBox) {
 			this.canvas.viewbox(settings.viewBox)
 			this.canvas.zoom(settings.viewZoom, new SVG.Point())
