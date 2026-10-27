@@ -55,6 +55,7 @@ export type PathSymbolSaveObject = PathSaveObject & {
 	scale?: SVG.Point
 	options?: string[]
 	poles?: Pole
+	variable?: boolean
 }
 
 export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(Nameable(PathComponent)))) {
@@ -104,6 +105,12 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 	protected componentVariant: Variant
 
 	private isBattery: boolean = false
+
+	/**
+	 * only available for current sources: draws a diagonal arrow over the symbol to mark it as variable
+	 */
+	private variable: BooleanProperty
+	private variableArrow: SVG.G
 
 	constructor(symbol: ComponentSymbol) {
 		super()
@@ -156,11 +163,20 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 		this.properties.add(PropertyCategories.options, this.poleStart)
 		this.properties.add(PropertyCategories.options, this.poleEnd)
 
-		if (symbol.possibleOptions.length > 0 || symbol.possibleEnumOptions.length > 0) {
+		const canBeVariable = symbol.source == "isCurrent"
+		if (symbol.possibleOptions.length > 0 || symbol.possibleEnumOptions.length > 0 || canBeVariable) {
 			this.properties.add(
 				PropertyCategories.options,
 				new SectionHeaderProperty("Options", undefined, "options:header")
 			)
+			if (canBeVariable) {
+				this.variable = new BooleanProperty("Variable", false, false, undefined, "options:variable")
+				this.variable.addChangeListener((ev) => {
+					this.updateVariableArrow()
+					this.update()
+				})
+				this.properties.add(PropertyCategories.options, this.variable)
+			}
 			for (const option of symbol.possibleOptions) {
 				const property = new BooleanProperty(
 					option.displayName ?? option.name,
@@ -437,9 +453,65 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 		super.recalculateSnappingPoints()
 	}
 
+	/**
+	 * the start and end point of the variable arrow in local symbol coordinates: diagonally across the symbol from bottom left to top right, slightly overhanging
+	 */
+	private variableArrowPoints(): [SVG.Point, SVG.Point] {
+		const box = this.componentVariant.viewBox
+		const overhang = 0.15
+		return [
+			new SVG.Point(box.x - overhang * box.w, box.y2 + overhang * box.h),
+			new SVG.Point(box.x2 + overhang * box.w, box.y - overhang * box.h),
+		]
+	}
+
+	/**
+	 * the (thickest) line width used in the symbol in px, such that the variable arrow matches the symbol
+	 */
+	private symbolStrokeWidth(): number {
+		let width = 0.53
+		for (const element of this.componentVariant.symbol.node.querySelectorAll("[stroke-width]")) {
+			width = Math.max(width, Number.parseFloat(element.getAttribute("stroke-width")) || 0)
+		}
+		return width
+	}
+
+	private updateVariableArrow() {
+		this.variableArrow?.remove()
+		this.variableArrow = null
+		if (!this.variable?.value) {
+			return
+		}
+
+		const [start, end] = this.variableArrowPoints()
+		const dir = end.sub(start).div(end.sub(start).abs())
+		const normal = new SVG.Point(-dir.y, dir.x)
+		const strokeWidth = this.symbolStrokeWidth()
+		// approximately the size of the tikz "latex" arrow tip, which grows with the line width
+		const tipLength = 2.5 + 2.5 * strokeWidth
+		const tipWidth = 0.75 * tipLength
+
+		this.variableArrow = CanvasController.instance.canvas.group()
+		const lineEnd = end.sub(dir.mul(tipLength * 0.8))
+		this.variableArrow
+			.line(start.x, start.y, lineEnd.x, lineEnd.y)
+			.stroke({ color: defaultStroke, width: strokeWidth })
+		const tipBase = end.sub(dir.mul(tipLength))
+		this.variableArrow
+			.polygon([
+				end.toArray(),
+				tipBase.add(normal.mul(tipWidth / 2)).toArray(),
+				tipBase.sub(normal.mul(tipWidth / 2)).toArray(),
+			])
+			.fill(defaultStroke)
+			.stroke("none")
+		this.visualization.add(this.variableArrow)
+	}
+
 	protected updateOptions(): void {
 		this.componentVariant = this.referenceSymbol.getVariant(this.optionsFromProperties())
 		this.componentVisualization.node.setAttribute("href", "#" + this.componentVariant.symbol.id())
+		this.updateVariableArrow()
 
 		let startPinIndex = this.componentVariant.pins.findIndex((value) => value.name === "START")
 		let endPinIndex = this.componentVariant.pins.findIndex((value) => value.name === "END")
@@ -524,6 +596,7 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 
 		let m = this.getTransformMatrix()
 		this.componentVisualization.transform(m)
+		this.variableArrow?.transform(m)
 
 		let startLineEndPoint = this.relSymbolStart.add(this.componentVariant.mid).transform(m)
 		let endLineStartPoint = this.relSymbolEnd.add(this.componentVariant.mid).transform(m)
@@ -703,6 +776,10 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 			data.poles = poles
 		}
 
+		if (this.variable?.value) {
+			data.variable = true
+		}
+
 		return data
 	}
 
@@ -714,7 +791,21 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 			connectors: [],
 		}
 		this.buildTikzCommand(command)
-		return buildTikzStringFromPathCommand(command)
+		let tikz = buildTikzStringFromPathCommand(command)
+		if (this.variable?.value) {
+			const m = this.getTransformMatrix()
+			const [start, end] = this.variableArrowPoints().map((point) => point.transform(m))
+			const lineWidth = new SVG.Number(this.symbolStrokeWidth(), "px").convertToUnit("pt")
+			tikz +=
+				"\n\t\\draw[-latex, line width=" +
+				lineWidth.value.toFixed(2) +
+				"pt] " +
+				start.toTikzString() +
+				" -- " +
+				end.toTikzString() +
+				";"
+		}
+		return tikz
 	}
 
 	protected buildTikzCommand(command: TikzPathCommand): void {
@@ -785,6 +876,11 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 			if (saveObject.poles.end != undefined) {
 				this.poleEnd.value = poleChoices.find((choice) => choice.key == saveObject.poles.end)
 			}
+		}
+
+		if (this.variable) {
+			this.variable.value = saveObject.variable ?? false
+			this.updateVariableArrow()
 		}
 
 		this.update()
