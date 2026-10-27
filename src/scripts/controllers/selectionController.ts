@@ -286,6 +286,17 @@ export class SelectionController {
 	}
 
 	/**
+	 * the point around which the selection is rotated/flipped. A single component is transformed around its own position, since its bounding box can be off center (e.g. due to labels)
+	 */
+	private getTransformationCenter(): SVG.Point {
+		if (this.currentlySelectedComponents.length == 1) {
+			return this.currentlySelectedComponents[0].position.clone()
+		}
+		let overallBBox = this.getOverallBoundingBox()
+		return new SVG.Point(overallBBox.cx, overallBBox.cy)
+	}
+
+	/**
 	 *
 	 * @param {Number} angleDeg rotation in degrees (only 90 degree multiples, also negative)
 	 */
@@ -295,8 +306,7 @@ export class SelectionController {
 			return
 		}
 
-		let overallBBox = this.getOverallBoundingBox()
-		let overallCenter = new SVG.Point(overallBBox.cx, overallBBox.cy)
+		let overallCenter = this.getTransformationCenter()
 
 		//rotate all components/lines individually around their center
 		//get individual center and rotate that around overall center
@@ -321,8 +331,7 @@ export class SelectionController {
 			return
 		}
 
-		let overallBBox = this.getOverallBoundingBox()
-		let overallCenter = new SVG.Point(overallBBox.cx, overallBBox.cy)
+		let overallCenter = this.getTransformationCenter()
 		let flipX = horizontal ? 0 : -2
 		let flipY = horizontal ? -2 : 0
 
