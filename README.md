@@ -1,9 +1,10 @@
 # CircuiTi*k*Z-Designer
 
-[![License](https://img.shields.io/github/license/circuit2tikz/circuitikz-designer)](LICENSE)
-![GitHub last commit (dev)](https://img.shields.io/github/last-commit/circuit2tikz/circuitikz-designer/dev)
-![GitHub commit activity (dev)](https://img.shields.io/github/commit-activity/m/circuit2tikz/circuitikz-designer/dev)
-![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/circuit2tikz/circuitikz-designer)
+## Todos
+- Turn axis off
+- why not always save in .tikz? why is json needed?
+- save groups of own components
+- Import external Tikz files if possible
 
 An interactive, visual, online editor for creating electrical circuit diagrams for LaTeX/CircuiTi*k*Z with ease. Try it out [online](https://circuit2tikz.tf.fau.de/designer/)!
 

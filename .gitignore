@@ -106,3 +106,9 @@
 *.7z
 *.zip
 /out
+
+# package.json lock file
+package-lock.json
+
+# Zone.identifier
+*:Zone:Identifier
