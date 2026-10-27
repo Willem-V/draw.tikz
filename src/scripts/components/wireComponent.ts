@@ -53,6 +53,7 @@ function oppositeDirection(direction: WireDirection): WireDirection {
  */
 export type WireSaveObject = PathSaveObject & {
 	directions: WireDirection[]
+	onlyStraight?: boolean
 	startArrow?: string
 	endArrow?: string
 	stroke?: StrokeInfo
@@ -330,8 +331,8 @@ export class WireComponent extends Strokable(PathComponent) {
 								this.wireDirections[index] = WireDirection.Straight
 							}
 						} else {
-							// change the wire direction if necessary
-							if (index > 0) {
+							// change the wire direction if necessary. Straight (e.g. diagonal) segments stay straight
+							if (index > 0 && this.wireDirections[index - 1] != WireDirection.Straight) {
 								// from the last point to this point
 								dirs[index - 1] = this.directionVecFromPos(
 									pos.sub(this.referencePoints[index - 1]),
@@ -339,7 +340,10 @@ export class WireComponent extends Strokable(PathComponent) {
 								)
 								this.wireDirections[index - 1] = this.wireDirectionFromDirectionVec(dirs[index - 1], ev)
 							}
-							if (index < this.adjustmentPoints.length - 1) {
+							if (
+								index < this.adjustmentPoints.length - 1 &&
+								this.wireDirections[index] != WireDirection.Straight
+							) {
 								// from this point to the next point
 								let rel = pos.sub(this.referencePoints[index + 1])
 								dirs[index] = this.directionVecFromPos(rel, dirs[index])
@@ -560,6 +564,9 @@ export class WireComponent extends Strokable(PathComponent) {
 		let data = super.toJson() as WireSaveObject
 		data.type = WireComponent.jsonID
 		data.directions = this.wireDirections
+		if (this.onlyStraight) {
+			data.onlyStraight = true
+		}
 
 		if (this.arrowStartChoice.value.key !== defaultArrowTip.key) {
 			data.startArrow = this.arrowStartChoice.value.key
@@ -590,7 +597,12 @@ export class WireComponent extends Strokable(PathComponent) {
 				return null
 			}
 		}
-		return new WireComponent()
+		// older saves don't store onlyStraight: treat wires consisting only of straight segments as straight lines
+		const onlyStraight =
+			saveObject.onlyStraight ??
+			(saveObject.directions?.length > 0 &&
+				saveObject.directions.every((direction) => direction == WireDirection.Straight))
+		return new WireComponent(onlyStraight)
 	}
 
 	protected buildTikzCommand(command: TikzPathCommand): void {
