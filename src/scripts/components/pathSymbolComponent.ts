@@ -884,8 +884,9 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 			this.updateVariableArrow()
 		}
 
-		this.update()
+		// show before updating: label positions are calculated from bounding boxes, which are empty for hidden elements
 		this.visualization.show()
+		this.update()
 		this.updatePoles()
 	}
 

@@ -399,8 +399,9 @@ export class ShortComponent extends Currentable(PathLabelable(PathComponent)) {
 			this.scaleProperty.value = new SVG.Number(saveObject.scale)
 		}
 
-		this.update()
+		// show before updating: label positions are calculated from bounding boxes, which are empty for hidden elements
 		this.visualization.show()
+		this.update()
 		this.updatePoles()
 	}
 
