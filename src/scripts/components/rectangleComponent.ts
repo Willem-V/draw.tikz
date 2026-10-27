@@ -20,13 +20,28 @@ import {
 	TextAreaProperty,
 	textToSVG,
 	TikzNodeCommand,
+	TikzPathCommand,
+	buildTikzStringFromPathCommand,
+	buildTikzStringFromNodeCommand,
 	RadioButtonProperty,
+	defaultStroke,
 } from "../internal"
 import { pointInsideRect, rectRectIntersection, roundTikz, selectionSize } from "../utils/selectionHelper"
 
 export type RectangleSaveObject = ShapeSaveObject & {
 	text?: Text
+	array?: ArrayInfo
 }
+
+/**
+ * a rectangle drawn as an array: extra outlines offset to the top right, so it looks like a stack of rectangles
+ */
+export type ArrayInfo = {
+	layers: number
+	offset: string | SVG.Number
+}
+const defaultArrayLayers = 2
+const defaultArrayOffset = new SVG.Number(4, "pt")
 
 export type FontSize = ChoiceEntry & {
 	size: number
@@ -96,6 +111,11 @@ export class RectangleComponent extends ShapeComponent {
 	private createAsText: boolean
 	private useHyphenation: boolean
 
+	private arrayProperty: BooleanProperty
+	private arrayLayers: SliderProperty
+	private arrayOffset: SliderProperty
+	private arrayVisualization: SVG.Path
+
 	public constructor(createAsText: boolean = false) {
 		super()
 		this.createAsText = createAsText
@@ -111,9 +131,57 @@ export class RectangleComponent extends ShapeComponent {
 			stroke: "none",
 		})
 
+		this.arrayVisualization = CanvasController.instance.canvas.path().fill("none")
+		this.arrayVisualization.hide()
+
+		this.visualization.add(this.arrayVisualization)
 		this.visualization.add(this.componentVisualization)
 
 		this.visualization.add(this.dragElement)
+
+		this.properties.add(PropertyCategories.options, new SectionHeaderProperty("Array", undefined, "array:header"))
+		this.arrayProperty = new BooleanProperty(
+			"Draw as array",
+			false,
+			undefined,
+			"Draw extra outlines behind the rectangle so it looks like a stack (array) of rectangles",
+			"array:enable"
+		)
+		this.arrayProperty.addChangeListener((ev) => {
+			this.update()
+			this.updateTheme()
+		})
+		this.properties.add(PropertyCategories.options, this.arrayProperty)
+
+		this.arrayLayers = new SliderProperty(
+			"Layers",
+			1,
+			5,
+			1,
+			new SVG.Number(defaultArrayLayers),
+			true,
+			undefined,
+			"array:layers"
+		)
+		this.arrayLayers.addChangeListener((ev) => {
+			this.update()
+		})
+		this.properties.add(PropertyCategories.options, this.arrayLayers)
+
+		this.arrayOffset = new SliderProperty(
+			"Offset",
+			1,
+			20,
+			0.5,
+			defaultArrayOffset,
+			undefined,
+			undefined,
+			"array:offset"
+		)
+		this.arrayOffset.addChangeListener((ev) => {
+			this.update()
+		})
+		this.properties.add(PropertyCategories.options, this.arrayOffset)
 
 		this.properties.add(PropertyCategories.text, new SectionHeaderProperty("Text", undefined, "text:header"))
 		this.textAreaProperty = new TextAreaProperty("", undefined, "text:area")
@@ -306,7 +374,104 @@ export class RectangleComponent extends ShapeComponent {
 		} else {
 			this.dragElement.attr({ fill: "transparent", stroke: "none" })
 		}
+		this.updateArray()
 		this.updateText()
+	}
+
+	/**
+	 * the outlines of the array layers in the local (unrotated) coordinate frame of the rectangle. Only the visible part of each layer is drawn: up from the layer in front, along the top, down the right side and back to the layer in front
+	 */
+	private arrayLayerPoints(): SVG.Point[][] {
+		if (!this.arrayProperty.value) {
+			return []
+		}
+		const halfStroke = this.strokeInfo.width.convertToUnit("px").value / 2
+		const offset = this.arrayOffset.value.convertToUnit("px").value
+		const left = halfStroke
+		const top = halfStroke
+		const right = this.size.x - halfStroke
+		const bottom = this.size.y - halfStroke
+
+		const layers: SVG.Point[][] = []
+		for (let layer = 1; layer <= Math.round(this.arrayLayers.value.value); layer++) {
+			const d = layer * offset
+			layers.push([
+				new SVG.Point(left + d, top - d + offset),
+				new SVG.Point(left + d, top - d),
+				new SVG.Point(right + d, top - d),
+				new SVG.Point(right + d, bottom - d),
+				new SVG.Point(right + d - offset, bottom - d),
+			])
+		}
+		return layers
+	}
+
+	private updateArray() {
+		const layers = this.arrayLayerPoints()
+		if (layers.length == 0) {
+			this.arrayVisualization.hide()
+			return
+		}
+		const pathString = layers
+			.map((points) => "M" + points.map((point) => point.toSVGPathString()).join("L"))
+			.join("")
+		this.arrayVisualization.plot(pathString)
+		this.arrayVisualization.transform(this.getTransformMatrix())
+		this.arrayVisualization.show()
+		this._bbox = this._bbox.merge(this.arrayVisualization.bbox().transform(this.getTransformMatrix()))
+	}
+
+	public updateTheme(): void {
+		super.updateTheme()
+		let strokeColor = this.strokeInfo.color
+		if (strokeColor == "default") {
+			strokeColor = defaultStroke
+		}
+		this.arrayVisualization?.stroke({
+			color: strokeColor,
+			opacity: this.strokeInfo.opacity,
+			width: this.strokeInfo.opacity == 0 ? 0 : this.strokeInfo.width.convertToUnit("px").value,
+			dasharray: this.strokeStyleProperty.value.dasharray
+				.map((factor) => this.strokeInfo.width.times(factor).toString())
+				.join(" "),
+		})
+	}
+
+	public toTikzString(): string {
+		const nodeCommand: TikzNodeCommand = { options: [], additionalNodes: [] }
+		this.buildTikzCommand(nodeCommand)
+		// copy the options, building the node string modifies them
+		const nodeOptions = [...nodeCommand.options]
+		const nodeString = buildTikzStringFromNodeCommand(nodeCommand)
+		const layers = this.arrayLayerPoints()
+		if (layers.length == 0) {
+			return nodeString
+		}
+
+		// draw the array outlines with the same stroke as the rectangle itself
+		const strokeOptions = nodeOptions.filter(
+			(option) =>
+				option == "draw" ||
+				option.startsWith("draw=") ||
+				option.startsWith("draw opacity") ||
+				option.startsWith("line width") ||
+				option.startsWith("dash pattern")
+		)
+		if (!strokeOptions.some((option) => option == "draw" || option.startsWith("draw="))) {
+			return nodeString
+		}
+
+		const transformMatrix = this.getTransformMatrix()
+		const arrayStrings = layers.map((points) => {
+			const command: TikzPathCommand = {
+				options: [...strokeOptions],
+				coordinates: points.map((point) => point.transform(transformMatrix)),
+				connectors: points.slice(1).map(() => "--"),
+				additionalNodes: [],
+			}
+			return buildTikzStringFromPathCommand(command)
+		})
+		return [nodeString, ...arrayStrings].join("\n\t")
 	}
 
 	public toJson(): RectangleSaveObject {
@@ -351,11 +516,32 @@ export class RectangleComponent extends ShapeComponent {
 			}
 		}
 
+		if (this.arrayProperty.value) {
+			data.array = {
+				layers: Math.round(this.arrayLayers.value.value),
+				offset: this.arrayOffset.value.toString(),
+			}
+		}
+
 		return data
 	}
 
 	protected applyJson(saveObject: RectangleSaveObject): void {
 		super.applyJson(saveObject)
+
+		if (saveObject.array) {
+			this.arrayProperty.value = true
+			this.arrayLayers.value = new SVG.Number(saveObject.array.layers ?? defaultArrayLayers)
+			const offset = saveObject.array.offset
+			if (!offset) {
+				this.arrayOffset.value = defaultArrayOffset
+			} else if (typeof offset == "string") {
+				this.arrayOffset.value = new SVG.Number(offset)
+			} else {
+				// SVG.Number as object
+				this.arrayOffset.value = new SVG.Number(offset.value, offset.unit)
+			}
+		}
 
 		if (saveObject.text) {
 			let text: Text = {

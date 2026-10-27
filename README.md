@@ -12,13 +12,13 @@ draw.tikz is a fork of [CircuiTi*k*Z-Designer](https://github.com/Circuit2TikZ/C
 - save groups of own components
 - Import external Tikz files if possible
 - Customizable saving: choose a project folder where the .json and .tikz are autosaved automatically (easier to retrieve, no loss when browser storage is overwritten)
-- Rectangle "array" switch: draw extra offset lines at the top and right so it looks like stacked rectangles (array of components)
 
 ## Changes compared to CircuiTi*k*Z-Designer
 
 - **Variable sources:** a "Variable" switch on all voltage and current sources draws a diagonal arrow over the symbol (also exported to Ti*k*Z)
 - **Transistor arrow position:** environment setting for `\ctikzset{transistors/arrow pos=...}`, defaulting to the end of the terminal. The canvas symbols for this are generated with [scripts/generateArrowEndSymbols.py](scripts/generateArrowEndSymbols.py)
 - **Enable axes:** the axes can be hidden like the grid; the grid setting is now also restored correctly
+- **Rectangle arrays:** a "Draw as array" switch on rectangles draws extra offset outlines at the top and right (adjustable number of layers and offset), so a rectangle around a device shows an array of devices (also exported to Ti*k*Z)
 - **Rectangles as frames:** unfilled rectangles without text can only be selected at their border, so components inside them can be clicked and the rectangle can be deselected
 - **Straight lines and arrows** stay straight after undo, copy/paste and reloading, and diagonal segments stay straight when resizing
 - **Flipping/rotating** a single component no longer moves it
