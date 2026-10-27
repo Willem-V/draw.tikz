@@ -30,6 +30,10 @@ type GlobalOption = {
 	name: string
 	tikz: "environment" | "ctikzset"
 	choices: { key: string; name: string; tikz: string }[]
+	/**
+	 * the key of the choice circuitikz uses if nothing is set. Only needed if it differs from the designer default, since the setting has to be exported whenever it differs from the circuitikz default
+	 */
+	tikzDefault?: string
 }
 
 // const globalSettings:Record<OptionsChoice, GlobalOption> = {} as any
@@ -119,6 +123,7 @@ const transistorArrowOption: GlobalOption = {
 		{ key: "legacy", name: "Arrows in the Middle of the Terminal", tikz: "transistors/arrow pos=legacy" },
 		{ key: "end", name: "Arrows at the End of the Terminal", tikz: "transistors/arrow pos=end" },
 	],
+	tikzDefault: "legacy",
 }
 
 const STYLE_PRESETS: Record<StylePreset, Partial<Record<OptionsChoice, string>>> = {
@@ -130,7 +135,7 @@ const STYLE_PRESETS: Record<StylePreset, Partial<Record<OptionsChoice, string>>>
 		// logic: "american",
 		voltageConvention: "noold",
 		labelOrientation: "smart",
-		transistorArrows: "legacy",
+		transistorArrows: "end",
 	},
 	american: {
 		// currents: "american",
@@ -272,7 +277,8 @@ export class EnvironmentVariableController {
 
 		let defaults = STYLE_PRESETS["default"]
 		for (const key of Object.keys(defaults)) {
-			if (defaults[key] !== this.globalSettings[key as OptionsChoice]) {
+			const tikzDefault = this.optionsMap.get(key as OptionsChoice).tikzDefault ?? defaults[key]
+			if (tikzDefault !== this.globalSettings[key as OptionsChoice]) {
 				if (this.optionsMap.get(key as OptionsChoice).tikz === "environment") {
 					environment.push(
 						this.optionsMap
