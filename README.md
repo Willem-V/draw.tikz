@@ -1,27 +1,41 @@
-# CircuiTi*k*Z-Designer
+# draw.tikz
+
+An interactive, visual editor for creating electrical circuit diagrams for LaTeX/CircuiTi*k*Z with ease.
+
+**Use it online: <https://draw-tikz-6714ec.pages.esat.kuleuven.cloud/>** (log in with your ESAT GitLab account)
+
+draw.tikz is a fork of [CircuiTi*k*Z-Designer](https://github.com/Circuit2TikZ/CircuiTikZ-Designer) by Manuel Kirzinger, Philipp Wiedemann and Christof Pfannenmüller (FAU), licensed under [GPL-3.0](LICENSE). The goal is to extend it step by step towards a general GUI for Ti*k*Z drawings.
 
 ## Todos
+
 - why not always save in .tikz? why is json needed?
 - save groups of own components
 - Import external Tikz files if possible
 - Customizable saving: choose a project folder where the .json and .tikz are autosaved automatically (easier to retrieve, no loss when browser storage is overwritten)
 - Rectangle "array" switch: draw extra offset lines at the top and right so it looks like stacked rectangles (array of components)
 
-An interactive, visual, online editor for creating electrical circuit diagrams for LaTeX/CircuiTi*k*Z with ease. Try it out [online](https://circuit2tikz.tf.fau.de/designer/)!
+## Changes compared to CircuiTi*k*Z-Designer
+
+- **Variable sources:** a "Variable" switch on all voltage and current sources draws a diagonal arrow over the symbol (also exported to Ti*k*Z)
+- **Transistor arrow position:** environment setting for `\ctikzset{transistors/arrow pos=...}`, defaulting to the end of the terminal. The canvas symbols for this are generated with [scripts/generateArrowEndSymbols.py](scripts/generateArrowEndSymbols.py)
+- **Enable axes:** the axes can be hidden like the grid; the grid setting is now also restored correctly
+- **Rectangles as frames:** unfilled rectangles without text can only be selected at their border, so components inside them can be clicked and the rectangle can be deselected
+- **Straight lines and arrows** stay straight after undo, copy/paste and reloading, and diagonal segments stay straight when resizing
+- **Flipping/rotating** a single component no longer moves it
+- **Labels** are at the correct position directly after loading a JSON file
+- No Google Analytics
 
 ## Overview
 
-CircuiTi*k*Z-Designer bridges the gap between visual circuit design and precise LaTeX code, letting you design, customize, and export diagrams without manually writing TikZ commands.
-Whether you’re preparing academic papers, teaching materials, or engineering documentation, CircuiTi*k*Z-Designer provides:
+draw.tikz bridges the gap between visual circuit design and precise LaTeX code, letting you design, customize, and export diagrams without manually writing TikZ commands.
+Whether you’re preparing academic papers, teaching materials, or engineering documentation, it provides:
 
 - A clean, intuitive interface for fast diagram creation
 - An extensive component library for all your circuit needs
 - Real-time previews and instant export to high-quality LaTeX code
 
-Stop wrestling with code syntax — focus on your circuit design, and let CircuiTikZ-Designer handle the Ti*k*Z.
-
-|         Edit in CircuiTi*k*Z-Designer         |            Export to compilable Ti*k*Z code            |
-| :-------------------------------------------: | :----------------------------------------------------: |
+|                 Edit in draw.tikz                 |            Export to compilable Ti*k*Z code            |
+| :-----------------------------------------------: | :----------------------------------------------------: |
 | ![sallen-key edit](./examples/sallen-key.png) | ![sallen-key export](./examples/sallen-key_export.png) |
 
 |               Use it in your LaTeX project!                |
@@ -38,30 +52,34 @@ Stop wrestling with code syntax — focus on your circuit design, and let Circui
 - **Cross-Platform Friendly:** Dark mode and mobile support for comfortable online editing anywhere
 - **MathJax Support:** Write MathJax math expressions directly inside text components with real-time rendering
 
-## Use locally
-
-1. Have [Node.js](https://nodejs.org/) installed
-2. Clone the repository
-3. Run "npm install" in terminal in project directory
-4. Run "npm start" in terminal in project directory
-5. Open website at URL provided in command line output
-
 ## How to use
 
 All controls of the application are explained in the help menu in the top right corner via the circled questionmark in the application itself.
 
-If you need help, please use the [general discussions](https://github.com/Circuit2TikZ/CircuiTikZ-Designer/discussions/categories/general) page.
+Drawings are stored in the browser (per address). Save your drawing regularly as a JSON file (Ctrl/⌘ + S) to be safe.
+
+## Use locally
+
+1. Have [Node.js](https://nodejs.org/) (v20) installed
+2. Clone the repository
+3. Run `npm ci` in the project directory
+
+There are two ways to run it:
+
+- **Stable copy for making drawings:** `scripts/stable.sh serve` serves a built copy of the `stable` branch on <http://localhost:8080>. It only changes when you release a new version with `scripts/stable.sh release [ref]` (fast-forwards `stable` to `ref`, default `main`, and rebuilds). The stable copy lives in the git worktree `../CircuiTikZ-Designer-stable`.
+- **Development server:** `npm start` serves the working tree on <http://localhost:1234> and reloads on every change. Don't make drawings here: a reload during development can overwrite the drawing stored in the browser.
+
+## Hosting (GitLab Pages)
+
+[.gitlab-ci.yml](.gitlab-ci.yml) builds the app and publishes it with GitLab Pages on every push to `main`. The job needs a GitLab runner with the Docker executor. To run one on your own machine:
+
+1. In GitLab: Settings > CI/CD > Runners > New project runner, tick "Run untagged jobs" and copy the token (`glrt-...`)
+2. Run `scripts/gitlab-runner.sh` (installs, registers and starts the runner; asks for the token). `scripts/gitlab-runner.sh status` and `scripts/gitlab-runner.sh stop` check or stop it.
+
+The runner is only needed for building; the published site stays online when the runner is off.
 
 ## Contributing
 
-### Bug reporting
+Report bugs and request features in the issues of the [GitLab project](https://gitlab.esat.kuleuven.be/willem.vandesteene/draw.tikz). Please always provide steps on how to reproduce a bug.
 
-Please use the [issues page](https://github.com/Circuit2TikZ/CircuiTikZ-Designer/issues) of the project to report bugs. Please always provide steps on how to reproduce the bug.
-
-### Feature requests
-
-You can post feature requests and discuss them on the [discussions](https://github.com/Circuit2TikZ/CircuiTikZ-Designer/discussions/categories/ideas) page.
-
-### Contribute code/component implementations
-
-Fork the repo, and create a pull request. Please always test your code thoroughly!
+Bugs that also occur in the original CircuiTi*k*Z-Designer can be reported [upstream](https://github.com/Circuit2TikZ/CircuiTikZ-Designer/issues).
