@@ -23,6 +23,11 @@ draw.tikz is a fork of [CircuiTi*k*Z-Designer](https://github.com/Circuit2TikZ/C
 - **Straight lines and arrows** stay straight after undo, copy/paste and reloading, and diagonal segments stay straight when resizing
 - **Flipping/rotating** a single component no longer moves it
 - **Labels** are at the correct position directly after loading a JSON file
+- **Line width for symbols:** every node and path symbol has a "Line width" setting that scales all its strokes like CircuiTi*k*Z's `line width` option (also exported to Ti*k*Z and SVG)
+- **Resizable blocks:** the generic two port (split) blocks and the European blank (not) ports have width, height and "Lock aspect ratio" instead of a scale, adjustable with drag handles on the canvas and exported with the matching CircuiTi*k*Z keys. Two port blocks can also contain text (`t=`)
+- **Block with pins and Mux** (Block diagram group): a rectangle, and a mux trapezoid with separate left and right height, with a configurable number of pins on each side (left, right, top, bottom; 0–16), resizable with handles. The mux can also have square pins. Both are exported as a CircuiTi*k*Z `muxdemux`, so the pins are available as `lpin 1`, `rpin 2`, `tpin 1`, `bpin 3`, …
+- **SVG export for Office:** text inside symbols (e.g. T, Q and Q̄ on flip-flops) and labels no longer disappear when the exported SVG is used in PowerPoint or Word
+- **Grid switch** at startup now matches whether the grid is visible
 - No Google Analytics
 
 ## Overview

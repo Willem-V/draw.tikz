@@ -24851,6 +24851,22 @@
 				</g>
 			</g>
 		</symbol>
+		<symbol id="node_muxdemux">
+			<g stroke="#000" stroke-miterlimit="10" stroke-width=".4">
+				<g fill="none" class="fillable">
+					<path stroke-width="1.06267" d="M11.11401.53134h84.66142v84.66142h-84.66142Z"/>
+					<path fill="none" stroke-width=".53134" d="M.53134 21.69669h10.58268m-10.58268 42.33071h10.58268m84.66141-42.33071h10.58268m-10.58268 42.33071h10.58268"/>
+				</g>
+			</g>
+		</symbol>
+		<symbol id="node_mux">
+			<g stroke="#000" stroke-miterlimit="10" stroke-width=".4">
+				<g fill="none" class="fillable">
+					<path stroke-width="1.06267" d="M11.11401 0.53134 L53.44472 21.69669 L53.44472 64.02740 L11.11401 85.19275Z"/>
+					<path fill="none" stroke-width=".53134" d="M11.11401 11.11401L0.53134 11.11401 M11.11401 32.27937L0.53134 32.27937 M11.11401 53.44472L0.53134 53.44472 M11.11401 74.61008L0.53134 74.61008 M53.44472 42.86204L64.02740 42.86204 M21.69669 79.90141L21.69669 90.48409 M42.86204 69.31874L42.86204 79.90141"/>
+				</g>
+			</g>
+		</symbol>
 		<symbol id="node_european-blank-not-port">
 			<g stroke="#000" stroke-miterlimit="10" stroke-width=".4">
 				<g fill="none" class="fillable">
@@ -41914,6 +41930,27 @@
 				<pin name="u2" x="-26.45656" y="5.29122"/>
 				<pin name="plus" x="19.84244" y="-5.29123"/>
 				<pin name="minus" x="19.84244" y="5.29122"/>
+			</variant>
+		</component>
+		<component type="node" display="Block with pins" tikz="muxdemux" group="Block diagram" class="muxdemuxes" fillable="True">
+			<variant x="53.44472" y="42.86204" viewBox="0 0 106.88944 85.72409" for="node_muxdemux">
+				<pin name="lpin 1" x="-52.91339" y="-21.16535"/>
+				<pin name="lpin 2" x="-52.91339" y="21.16535"/>
+				<pin name="rpin 1" x="52.91339" y="-21.16535"/>
+				<pin name="rpin 2" x="52.91339" y="21.16535"/>
+				<textpos x="0.00000" y="0.00000"/>
+			</variant>
+		</component>
+		<component type="node" display="Mux" tikz="mux" group="Block diagram" class="muxdemuxes" fillable="True">
+			<variant x="32.27937" y="42.86204" viewBox="0 0 64.55873 91.01543" for="node_mux">
+				<pin name="lpin 1" x="-31.74803" y="-31.74803"/>
+				<pin name="lpin 2" x="-31.74803" y="-10.58268"/>
+				<pin name="lpin 3" x="-31.74803" y="10.58268"/>
+				<pin name="lpin 4" x="-31.74803" y="31.74803"/>
+				<pin name="rpin 1" x="31.74803" y="0.00000"/>
+				<pin name="bpin 1" x="-10.58268" y="47.62205"/>
+				<pin name="bpin 2" x="10.58268" y="37.03937"/>
+				<textpos x="0.00000" y="0.00000"/>
 			</variant>
 		</component>
 		<component type="path" display="Microstrip transmission line" tikz="mstline" group="RF components" shape="mstlineshape" class="RF" fillable="True">
