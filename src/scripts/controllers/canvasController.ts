@@ -176,7 +176,7 @@ export class CanvasController {
 		}
 
 		let gridVisibleToggle = document.getElementById("gridVisible") as HTMLInputElement
-
+		gridVisibleToggle.checked = this.gridVisible
 		gridVisibleToggle.addEventListener("change", (ev) => {
 			this.gridVisible = gridVisibleToggle.checked
 			this.paper.node.classList.toggle("d-none", !this.gridVisible)

@@ -30,8 +30,20 @@ import {
 	Voltageable,
 	Currentable,
 	EnvironmentVariableController,
+	SymbolLineWidth,
+	MathJaxProperty,
+	AdjustDragHandler,
+	generateLabelRender,
 } from "../internal"
-import { lineRectIntersection, pointInsideRect, selectedBoxWidth, selectionSize } from "../utils/selectionHelper"
+import {
+	lineRectIntersection,
+	pointInsideRect,
+	resizeSVG,
+	roundTikz,
+	selectedBoxWidth,
+	selectionSize,
+} from "../utils/selectionHelper"
+import { createSizeProperties, SizeProperties } from "../utils/sizeProperties"
 
 //TODO: add "line join" to poles, i.e. dot (.): this is essentially just a square with side length = line width (chapter 6.4 in documentation)
 export type PoleEntry = { key: string; name: string; shortcut: string }
@@ -56,9 +68,32 @@ export type PathSymbolSaveObject = PathSaveObject & {
 	options?: string[]
 	poles?: Pole
 	variable?: boolean
+	block?: BlockSaveObject
 }
 
-export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(Nameable(PathComponent)))) {
+export type BlockSaveObject = {
+	width?: number
+	height?: number
+	lockAspectRatio?: boolean
+	text?: string
+}
+
+/**
+ * the block diagram symbols which can be resized, i.e. where circuitikz has the keys bipoles/<name>/width and bipoles/<name>/height
+ */
+const resizableBlocks = ["twoport", "twoportsplit"]
+/**
+ * the default value of bipoles/<block>/width and bipoles/<block>/height
+ */
+const defaultBlockSize = 0.7
+/**
+ * the block size keys are relative to 1.4cm (the default bipoles/length)
+ */
+const blockSizeUnit = new SVG.Number(1.4, "cm").convertToUnit("px").value
+const blockThickStroke = 1.06267
+const blockThinStroke = 0.53134
+
+export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable(PathLabelable(Nameable(PathComponent))))) {
 	private static jsonID = "path"
 	static {
 		CircuitComponent.jsonSaveMap.set(PathSymbolComponent.jsonID, PathSymbolComponent)
@@ -112,6 +147,18 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 	private variable: BooleanProperty
 	private variableArrow: SVG.G
 
+	/**
+	 * only available for resizable blocks (see resizableBlocks): the size of the box (in units of 1.4cm, like circuitikz) and the text inside
+	 */
+	private blockSize: SizeProperties
+	private blockText: MathJaxProperty
+	private blockTextRendering: SVG.Element
+	/**
+	 * the symbol of resizable blocks is generated per instance
+	 */
+	private blockSymbol: SVG.Symbol
+	private blockResizeHandles: { direction: SVG.Point; element: SVG.Element }[] = []
+
 	constructor(symbol: ComponentSymbol) {
 		super()
 		this.scaleState = new SVG.Point(1, 1)
@@ -133,7 +180,21 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 			this.update()
 			this.updatePoles()
 		})
-		this.properties.add(PropertyCategories.manipulation, this.scaleProperty)
+		if (resizableBlocks.includes(symbol.tikzName)) {
+			// width and height replace the scale for resizable blocks
+			this.blockSize = createSizeProperties(
+				defaultBlockSize,
+				defaultBlockSize,
+				"Relative to 1.4cm, as in circuitikz. Can also be changed with the handles on the box.",
+				"manipulation:block",
+				() => this.updateOptions()
+			)
+			this.properties.add(PropertyCategories.manipulation, this.blockSize.width)
+			this.properties.add(PropertyCategories.manipulation, this.blockSize.height)
+			this.properties.add(PropertyCategories.manipulation, this.blockSize.lockAspectRatio)
+		} else {
+			this.properties.add(PropertyCategories.manipulation, this.scaleProperty)
+		}
 
 		this.optionProperties = new Map()
 		this.optionEnumProperties = new Map()
@@ -177,6 +238,10 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 					this.update()
 				})
 				this.properties.add(PropertyCategories.options, this.variable)
+				this.lineWidthProperty.addChangeListener((ev) => {
+					this.updateVariableArrow()
+					this.update()
+				})
 			}
 			for (const option of symbol.possibleOptions) {
 				const property = new BooleanProperty(
@@ -214,6 +279,9 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 		}
 
 		this.componentVariant = symbol.getVariant(this.optionsFromProperties())
+		if (resizableBlocks.includes(symbol.tikzName)) {
+			this.initBlock(symbol)
+		}
 
 		this.componentVisualization = CanvasController.instance.canvas.use(this.componentVariant.symbol)
 		this.componentVisualization.fill("none")
@@ -291,6 +359,111 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 				.filter((_, index) => !(index == startPinIndex || index == endPinIndex))
 				.map((pin) => new SnapPoint(this, pin.name, pin.point.add(this.componentVariant.mid))),
 		]
+	}
+
+	private initBlock(symbol: ComponentSymbol) {
+		this.properties.add(PropertyCategories.options, new SectionHeaderProperty("Text", undefined, "block:header"))
+		this.blockText = new MathJaxProperty(undefined, "Text inside the box", "block:text")
+		this.blockText.addChangeListener((ev) => this.generateBlockText())
+		this.properties.add(PropertyCategories.options, this.blockText)
+
+		this.blockSymbol = CanvasController.instance.canvas.defs().symbol()
+		this.componentVariant = this.blockVariant(this.componentVariant)
+	}
+
+	/**
+	 * (re)draws the symbol of a resizable block with the current size and returns the matching variant
+	 * @param baseVariant the variant from the symbol database, which is used for everything not depending on the size
+	 */
+	private blockVariant(baseVariant: Variant): Variant {
+		const w = Math.max(this.blockSize.width.value.value, 0.01) * blockSizeUnit
+		const h = Math.max(this.blockSize.height.value.value, 0.01) * blockSizeUnit
+		const half = blockThickStroke / 2
+		const scaledStroke = (width: number) => `calc(var(--line-scale, 1) * ${width}px)`
+
+		this.blockSymbol.clear()
+		const g = this.blockSymbol.group().attr({ stroke: defaultStroke, "stroke-miterlimit": 10 })
+		// transparent area, such that the block can also be selected by clicking inside
+		g.rect(w, h).move(half, half).fill("transparent").stroke("none")
+		const box = g.rect(w, h).move(half, half).fill("none").attr("stroke-width", blockThickStroke)
+		box.node.style.strokeWidth = scaledStroke(blockThickStroke)
+		if (baseVariant.pins.some((pin) => pin.name == "left up")) {
+			const diagonal = g.line(half, h + half, w + half, half).attr("stroke-width", blockThinStroke)
+			diagonal.node.style.strokeWidth = scaledStroke(blockThinStroke)
+		}
+
+		const pin = (name: string, x: number, y: number) => ({
+			name: name,
+			x: new SVG.Number(x, "px"),
+			y: new SVG.Number(y, "px"),
+			point: new SVG.Point(x, y),
+			isDefault: false,
+		})
+		const pins = baseVariant.pins.map((original) => {
+			const sx = Math.sign(Math.round(original.point.x))
+			const sy = Math.sign(Math.round(original.point.y))
+			// side anchors are at the middle of the sides, the split anchors at a quarter of the height
+			const isSplit = sx != 0 && sy != 0
+			return pin(original.name, (sx * w) / 2, isSplit ? (sy * h) / 4 : (sy * h) / 2)
+		})
+
+		return {
+			...baseVariant,
+			mid: new SVG.Point(w / 2 + half, h / 2 + half),
+			viewBox: new SVG.Box(0, 0, w + blockThickStroke, h + blockThickStroke),
+			symbol: this.blockSymbol,
+			symbolArrowEnd: undefined,
+			pins: pins,
+			maxStroke: blockThickStroke,
+		}
+	}
+
+	private generateBlockText() {
+		if (this.blockTextRendering) {
+			this.blockTextRendering = generateLabelRender(this.blockTextRendering, this.blockText)
+		} else {
+			this.blockTextRendering = generateLabelRender(undefined, this.blockText)
+		}
+		if (!this.blockText.value) {
+			this.blockTextRendering.remove()
+			this.blockTextRendering = undefined
+		} else {
+			this.visualization.add(this.blockTextRendering)
+		}
+		this.update()
+		this.updateTheme()
+	}
+
+	/**
+	 * the text of a block is always upright and centered in the box (like the t key in circuitikz)
+	 */
+	private updateBlockTextPosition() {
+		if (this.blockTextRendering) {
+			const bbox = this.blockTextRendering.bbox()
+			this.blockTextRendering.transform({
+				translate: [this.position.x - bbox.cx, this.position.y - bbox.cy],
+			})
+		}
+	}
+
+	/**
+	 * the transformation from box coordinates (origin in the center of the box, without scaling) to world coordinates
+	 */
+	private blockMatrix(): SVG.Matrix {
+		return new SVG.Matrix({ rotate: -this.rotationDeg, translate: [this.position.x, this.position.y] })
+	}
+
+	private updateBlockResizeHandles() {
+		const variant = this.componentVariant
+		const halfSize = new SVG.Point(
+			((variant.viewBox.w - blockThickStroke) / 2) * Math.abs(this.scaleState.x),
+			((variant.viewBox.h - blockThickStroke) / 2) * Math.abs(this.scaleState.y)
+		)
+		const m = this.blockMatrix()
+		for (const handle of this.blockResizeHandles) {
+			const point = handle.direction.mul(halfSize).transform(m)
+			handle.element.center(point.x, point.y)
+		}
 	}
 
 	private voltageConventionInvert() {
@@ -474,7 +647,11 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 		for (const element of this.componentVariant.symbol.node.querySelectorAll("[stroke-width]")) {
 			width = Math.max(width, Number.parseFloat(element.getAttribute("stroke-width")) || 0)
 		}
-		return width
+		return width * this.lineScale
+	}
+
+	protected lineWidthElements(): SVG.Element[] {
+		return [this.componentVisualization, this.poleStartElement, this.poleEndElement]
 	}
 
 	private updateVariableArrow() {
@@ -511,11 +688,16 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 
 	protected updateOptions(): void {
 		this.componentVariant = this.referenceSymbol.getVariant(this.optionsFromProperties())
+		if (this.blockSymbol) {
+			this.componentVariant = this.blockVariant(this.componentVariant)
+		}
 		this.componentVisualization.node.setAttribute("href", "#" + this.componentVariant.symbol.id())
 		this.updateVariableArrow()
 
 		let startPinIndex = this.componentVariant.pins.findIndex((value) => value.name === "START")
 		let endPinIndex = this.componentVariant.pins.findIndex((value) => value.name === "END")
+		this.relSymbolStart = this.componentVariant.pins.at(startPinIndex).point
+		this.relSymbolEnd = this.componentVariant.pins.at(endPinIndex).point
 		this.snappingPoints = [
 			new SnapPoint(this, null, new SVG.Point(0, 0)),
 			new SnapPoint(this, null, new SVG.Point(0, 0)),
@@ -541,6 +723,7 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 			this.visualization.add(this.poleEndElement)
 		}
 
+		this.updateLineWidth()
 		this.updatePolePositions()
 	}
 	private updatePolePositions() {
@@ -648,6 +831,7 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 
 		this.updatePolePositions()
 
+		this.updateBlockTextPosition()
 		this.updatePathLabel()
 		this.updateVoltageRender()
 		this.updateCurrentRender()
@@ -666,6 +850,54 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 				.center(bbox.cx, bbox.cy)
 				.size(bbox.w + selectedBoxWidth, bbox.h + selectedBoxWidth)
 				.transform(this.getTransformMatrix())
+		}
+	}
+
+	protected recalculateResizePoints(): void {
+		super.recalculateResizePoints()
+		this.updateBlockResizeHandles()
+	}
+
+	public resizable(enable: boolean): void {
+		const changed = this.isResizing != enable
+		super.resizable(enable)
+		if (!changed || !this.blockSymbol) {
+			return
+		}
+		if (enable) {
+			const directions = [new SVG.Point(1, 0), new SVG.Point(-1, 0), new SVG.Point(0, 1), new SVG.Point(0, -1)]
+			for (const direction of directions) {
+				const element = resizeSVG()
+				element.node.style.cursor = direction.x ? "ew-resize" : "ns-resize"
+				let startSize: [number, number]
+				AdjustDragHandler.snapDrag(this, element, true, {
+					dragStart: (pos) => {
+						startSize = [this.blockSize.width.value.value, this.blockSize.height.value.value]
+					},
+					dragMove: (pos) => {
+						// the box is resized symmetrically around its center
+						const local = pos.transform(this.blockMatrix().inverse())
+						const property = direction.x ? this.blockSize.width : this.blockSize.height
+						const scale = Math.abs(direction.x ? this.scaleState.x : this.scaleState.y)
+						const size = (2 * Math.abs(direction.x ? local.x : local.y)) / (blockSizeUnit * scale)
+						const rounded = Math.max(0.1, Math.round(size * 1000) / 1000)
+						property.updateValue(new SVG.Number(rounded), true)
+					},
+					dragEnd: () => {
+						return (
+							startSize[0] != this.blockSize.width.value.value || startSize[1] != this.blockSize.height.value.value
+						)
+					},
+				})
+				this.blockResizeHandles.push({ direction: direction, element: element })
+			}
+			this.updateBlockResizeHandles()
+		} else {
+			for (const handle of this.blockResizeHandles) {
+				AdjustDragHandler.snapDrag(this, handle.element, false)
+				handle.element.remove()
+			}
+			this.blockResizeHandles = []
 		}
 	}
 
@@ -698,6 +930,7 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 			labelColor = this.labelColor.value.toString()
 		}
 		this.labelRendering?.fill(labelColor)
+		this.blockTextRendering?.fill(defaultStroke)
 	}
 
 	public isInsideSelectionRectangle(selectionRectangle: SVG.Box): boolean {
@@ -781,6 +1014,25 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 			data.variable = true
 		}
 
+		if (this.blockSymbol) {
+			const block: BlockSaveObject = {}
+			if (this.blockSize.width.value.value != defaultBlockSize) {
+				block.width = this.blockSize.width.value.value
+			}
+			if (this.blockSize.height.value.value != defaultBlockSize) {
+				block.height = this.blockSize.height.value.value
+			}
+			if (this.blockSize.lockAspectRatio.value) {
+				block.lockAspectRatio = true
+			}
+			if (this.blockText.value) {
+				block.text = this.blockText.value
+			}
+			if (Object.keys(block).length > 0) {
+				data.block = block
+			}
+		}
+
 		return data
 	}
 
@@ -833,6 +1085,20 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 		if (scaleFactor) {
 			options.push("/tikz/circuitikz/bipoles/length=" + scaleFactor.value.toPrecision(3) + scaleFactor.unit)
 		}
+		options.push(...this.lineWidthTikzOptions())
+
+		if (this.blockSymbol) {
+			const key = "/tikz/circuitikz/bipoles/" + this.referenceSymbol.tikzName
+			if (this.blockSize.width.value.value != defaultBlockSize) {
+				options.push(key + "/width=" + roundTikz(this.blockSize.width.value.value))
+			}
+			if (this.blockSize.height.value.value != defaultBlockSize) {
+				options.push(key + "/height=" + roundTikz(this.blockSize.height.value.value))
+			}
+			if (this.blockText.value) {
+				options.push("t={$" + this.blockText.value + "$}")
+			}
+		}
 
 		let to: CircuitikzTo = { options: options, name: this.name.value }
 		this.buildTikzPathLabel(to)
@@ -848,6 +1114,8 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 		this.visualization.remove()
 		this.selectionElement?.remove()
 		this.labelRendering?.remove()
+		this.blockTextRendering?.remove()
+		this.blockSymbol?.remove()
 	}
 
 	public copyForPlacement(): PathSymbolComponent {
@@ -860,6 +1128,12 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 
 	public applyJson(saveObject: PathSymbolSaveObject): void {
 		super.applyJson(saveObject)
+		if (this.blockSymbol) {
+			this.blockSize.width.value = new SVG.Number(saveObject.block?.width ?? defaultBlockSize)
+			this.blockSize.height.value = new SVG.Number(saveObject.block?.height ?? defaultBlockSize)
+			this.blockSize.lockAspectRatio.value = saveObject.block?.lockAspectRatio ?? false
+			this.blockText.value = saveObject.block?.text ?? ""
+		}
 		let options = saveObject.options ?? []
 		this.setPropertiesFromOptions(this.referenceSymbol.getOptionsFromOptionNames(options))
 
@@ -869,6 +1143,15 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 		this.mirror.value = this.scaleState.y < 0
 		this.invert.value = this.scaleState.x * this.voltageConventionInvert() < 0
 		this.scaleProperty.value = new SVG.Number(Math.abs(this.scaleState.x))
+		if (this.blockSymbol && (Math.abs(this.scaleState.x) != 1 || Math.abs(this.scaleState.y) != 1)) {
+			// older saves could scale blocks: convert to the equivalent size
+			const round = (value: number) => new SVG.Number(Math.round(value * 1000) / 1000)
+			this.blockSize.width.value = round(this.blockSize.width.value.value * Math.abs(this.scaleState.x))
+			this.blockSize.height.value = round(this.blockSize.height.value.value * Math.abs(this.scaleState.y))
+			this.scaleState = new SVG.Point(Math.sign(this.scaleState.x), Math.sign(this.scaleState.y))
+			this.scaleProperty.value = new SVG.Number(1)
+			this.updateOptions()
+		}
 
 		if (saveObject.poles) {
 			if (saveObject.poles.start != undefined) {
@@ -886,6 +1169,9 @@ export class PathSymbolComponent extends Currentable(Voltageable(PathLabelable(N
 
 		// show before updating: label positions are calculated from bounding boxes, which are empty for hidden elements
 		this.visualization.show()
+		if (this.blockText?.value) {
+			this.generateBlockText()
+		}
 		this.update()
 		this.updatePoles()
 	}

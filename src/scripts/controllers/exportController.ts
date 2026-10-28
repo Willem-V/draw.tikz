@@ -186,6 +186,8 @@ export class ExportController {
 			svgObj.add(component)
 		}
 
+		inlineNonSymbolUses(svgObj)
+
 		//basic cleanup of invisible components (fill and stroke both need to be invisible)
 		for (const removeElement of svgObj.find(
 			':is([fill-opacity="0"],[fill="none"],[fill="transparent"]):is([stroke-opacity="0"],[stroke="none"],[stroke-width="0"],[stroke="transparent"])'
@@ -289,5 +291,53 @@ export class ExportController {
 		this.saveButton.addEventListener("click", saveFile, { passive: true })
 
 		this.modal.show()
+	}
+}
+
+/**
+ * Replaces all use elements which don't reference a symbol (e.g. the glyphs of text in symbols and labels) with a copy of the referenced element.
+ * Some programs (e.g. Microsoft Office) can't resolve these references, especially if the referenced element is defined inside a symbol.
+ */
+function inlineNonSymbolUses(svgObj: SVG.Svg) {
+	const xlinkNS = "http://www.w3.org/1999/xlink"
+	// referenced elements can contain use elements themselves -> repeat until nothing is left (with a limit against cyclic references)
+	for (let iteration = 0; iteration < 10; iteration++) {
+		let replaced = false
+		for (const use of svgObj.node.querySelectorAll("use")) {
+			const href = use.getAttributeNS(xlinkNS, "href") ?? use.getAttribute("href")
+			if (!href?.startsWith("#")) {
+				continue
+			}
+			const referenced = svgObj.node.querySelector(`[id="${CSS.escape(href.slice(1))}"]`)
+			if (!referenced || referenced.nodeName == "symbol") {
+				continue
+			}
+			const group = document.createElementNS("http://www.w3.org/2000/svg", "g")
+			for (const attribute of use.attributes) {
+				if (
+					!attribute.name.includes(":") &&
+					!["href", "x", "y", "width", "height", "transform", "id"].includes(attribute.name)
+				) {
+					group.setAttribute(attribute.name, attribute.value)
+				}
+			}
+			const x = Number.parseFloat(use.getAttribute("x") ?? "0") || 0
+			const y = Number.parseFloat(use.getAttribute("y") ?? "0") || 0
+			const transform = [use.getAttribute("transform"), x || y ? `translate(${x} ${y})` : null]
+				.filter((part) => part)
+				.join(" ")
+			if (transform) {
+				group.setAttribute("transform", transform)
+			}
+			const copy = referenced.cloneNode(true) as Element
+			copy.removeAttribute("id")
+			copy.querySelectorAll("[id]").forEach((element) => element.removeAttribute("id"))
+			group.appendChild(copy)
+			use.replaceWith(group)
+			replaced = true
+		}
+		if (!replaced) {
+			break
+		}
 	}
 }

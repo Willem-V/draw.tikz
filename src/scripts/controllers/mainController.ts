@@ -217,6 +217,7 @@ export class MainController {
 			// prepare symbolDB for colorTheme
 			for (const g of this.symbolsSVG.defs().node.querySelectorAll("symbol>g")) {
 				this.preprocessSymbolColors(g)
+				this.preprocessSymbolStrokes(g)
 			}
 
 			const htmlElement = document.documentElement
@@ -1490,6 +1491,19 @@ export class MainController {
 	 * called once on initialization
 	 * @param {Element} node
 	 */
+	/**
+	 * make all stroke widths of a symbol scalable via the css custom property "--line-scale" (set on the use element, see SymbolLineWidth).
+	 * The stroke-width attribute is kept, since it is used to determine the maximum stroke width of the symbol
+	 */
+	private preprocessSymbolStrokes(node: Element) {
+		for (const elem of [node, ...node.querySelectorAll("[stroke-width]")]) {
+			const strokeWidth = elem.getAttribute("stroke-width")
+			if (strokeWidth) {
+				;(elem as SVGElement).style.strokeWidth = `calc(var(--line-scale, 1) * ${strokeWidth}px)`
+			}
+		}
+	}
+
 	private preprocessSymbolColors(node: Element) {
 		//exchange all explicit blacks with defaultStroke and all explicit whites with defaultFill
 		node.querySelectorAll("[fill]").forEach((elem) => {
