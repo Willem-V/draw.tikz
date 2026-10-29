@@ -107,6 +107,19 @@ export class CanvasController {
 			CanvasController.instance.draggingFromInput = null
 		})
 
+		// the selection and drag handlers prevent the default of mousedown, which also keeps the focus in e.g. a property input.
+		// Shortcuts (like del) are ignored while an input has the focus, so clicking the canvas has to take it away
+		this.canvas.node.addEventListener(
+			"pointerdown",
+			() => {
+				const focused = document.activeElement
+				if (focused instanceof HTMLElement && focused != document.body) {
+					focused.blur()
+				}
+			},
+			{ capture: true }
+		)
+
 		const panFactor = 20
 		let body = document.getElementsByTagName("body")[0]
 		document.addEventListener("keydown", (ev) => {

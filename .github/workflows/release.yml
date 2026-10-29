@@ -1,4 +1,4 @@
-# A version tag (vX.Y.Z, matching vscode/package.json) builds the VS Code extension and attaches it to a GitHub Release
+# A version tag (vX.Y.Z, matching package.json and vscode/package.json) builds the VS Code extension and attaches it to a GitHub Release
 name: Release extension
 
 on:
@@ -22,14 +22,16 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             vscode/package-lock.json
-      - name: Check that the tag matches the extension version
+      - name: Check that the tag matches the app and extension version
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          EXTENSION_VERSION=$(node -p "require('./vscode/package.json').version")
-          if [ "$EXTENSION_VERSION" != "$VERSION" ]; then
-            echo "::error::tag $GITHUB_REF_NAME does not match vscode/package.json version $EXTENSION_VERSION"
-            exit 1
-          fi
+          for file in package.json vscode/package.json; do
+            FILE_VERSION=$(node -p "require('./$file').version")
+            if [ "$FILE_VERSION" != "$VERSION" ]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match the version $FILE_VERSION in $file"
+              exit 1
+            fi
+          done
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
       - run: npm ci --no-audit --no-fund
       - name: Package the extension

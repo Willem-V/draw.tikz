@@ -43,7 +43,7 @@ All controls of the editor are explained in the help menu (circled question mark
 - **Line width for symbols:** every node and path symbol has a "Line width" setting that scales all its strokes like CircuiTi*k*Z's `line width` option (also exported to Ti*k*Z and SVG)
 - **Resizable blocks:** the generic two port (split) blocks and the European blank (not) ports have width, height and "Lock aspect ratio" instead of a scale, adjustable with drag handles on the canvas and exported with the matching CircuiTi*k*Z keys. Two port blocks can also contain text (`t=`)
 - **Block with pins and Mux** (Block diagram group): a rectangle, and a mux trapezoid with separate left and right height, with a configurable number of pins on each side (left, right, top, bottom; 0–16), resizable with handles. The mux can also have square pins. Both are exported as a CircuiTi*k*Z `muxdemux`, so the pins are available as `lpin 1`, `rpin 2`, `tpin 1`, `bpin 3`, …
-- **Symbol picker:** the symbol panel pops up in the middle of the screen (Q or I) and can be used with the keyboard like a picker in vim: type to search (fuzzy or regex), Enter places the highlighted symbol, Ctrl+J/K moves while typing, Esc switches to normal mode with h/j/k/l, gg/G and / (Esc or q closes)
+- **Symbol picker:** the symbol panel pops up in the middle of the screen (Q or I) and can be used with the keyboard like a picker in vim: type to search (fuzzy or regex), Enter places the highlighted symbol, Ctrl+J/K moves while typing, Tab switches to normal mode with h/j/k/l, gg/G and / (Tab goes back), Esc closes
 - **SVG export for Office:** text inside symbols (e.g. T, Q and Q̄ on flip-flops) and labels no longer disappear when the exported SVG is used in PowerPoint or Word
 - **Grid switch** at startup now matches whether the grid is visible
 - No Google Analytics, no Electron desktop app
@@ -83,7 +83,7 @@ Two workflows in [.github/workflows](.github/workflows):
 
 To release a new extension version:
 
-1. Bump `version` in [vscode/package.json](vscode/package.json) (the workflow fails if the tag does not match it) and commit
+1. Bump `version` in [package.json](package.json) (shown in the app) and [vscode/package.json](vscode/package.json) (the workflow fails if the tag does not match both) and commit
 2. `git tag vX.Y.Z && git push origin main vX.Y.Z`
 
 GitHub Actions is free for public repositories.
@@ -102,5 +102,5 @@ Bugs that also occur in the original CircuiTi*k*Z-Designer can be reported [upst
 
 ## Todos
 
-- Save groups of own components
-- Import external Ti*k*Z files if possible
+- **Reusable component groups:** save a selection as its own JSON file and import it into another drawing, both in VS Code and in the browser
+- **Import Ti*k*Z/JSON files:** add the contents of an existing JSON drawing or Ti*k*Z file to the current drawing. Ti*k*Z needs a conversion of the code to the JSON format

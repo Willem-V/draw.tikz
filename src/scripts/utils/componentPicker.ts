@@ -2,7 +2,8 @@ import { Offcanvas } from "bootstrap"
 
 /**
  * Keyboard navigation in the symbol picker, similar to a picker in vim: typing in the search field is the insert mode,
- * Esc switches to the normal mode, in which h/j/k/l move between the symbols. Enter places the highlighted symbol in both modes.
+ * Tab switches to the normal mode, in which h/j/k/l move between the symbols, and back. Enter places the highlighted symbol
+ * and Esc closes the picker in both modes.
  */
 export function initComponentPickerNavigation(panel: HTMLDivElement, offcanvas: Offcanvas) {
 	const searchInput = document.getElementById("componentFilterInput") as HTMLInputElement
@@ -107,10 +108,15 @@ export function initComponentPickerNavigation(panel: HTMLDivElement, offcanvas: 
 		}
 		if (ev.key == "Escape") {
 			handled()
+			offcanvas.hide()
+			return
+		}
+		if (ev.key == "Tab") {
+			handled()
 			if (inSearch) {
 				normalMode()
 			} else {
-				offcanvas.hide()
+				insertMode()
 			}
 			return
 		}

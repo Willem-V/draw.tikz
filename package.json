@@ -1,6 +1,6 @@
 {
 	"name": "draw.tikz",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"private": "true",
 	"description": "An interactive, visual editor for creating TikZ drawings for LaTeX.",
 	"license": "GPL-3.0-only",

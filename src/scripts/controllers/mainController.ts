@@ -22,7 +22,6 @@ import {
 	WireComponent,
 	ComponentSymbol,
 	ComponentSaveObject,
-	EraseController,
 	RectangleComponent,
 	EllipseComponent,
 	defaultStroke,
@@ -65,7 +64,6 @@ export type CanvasSettings = {
 export enum Modes {
 	DRAG_PAN,
 	COMPONENT,
-	ERASE,
 }
 
 // TODO Test
@@ -98,12 +96,6 @@ export class MainController {
 	private hostExports: SaveFileFormat["exports"]
 
 	mode = Modes.DRAG_PAN
-
-	private modeSwitchButtons = {
-		modeDragPan: null,
-		modeDrawLine: null,
-		modeEraser: null,
-	}
 
 	initPromise: Promise<any>
 	isInitDone: boolean = false
@@ -178,7 +170,6 @@ export class MainController {
 			}
 		})
 
-		this.initModeButtons()
 
 		this.updateTooltips()
 
@@ -209,7 +200,6 @@ export class MainController {
 		})
 
 		canvasPromise.then(() => {
-			EraseController.instance
 			SelectionController.instance
 			PropertyController.instance
 			ComponentPlacer.instance
@@ -858,7 +848,7 @@ export class MainController {
 			Undo.undo()
 			return false
 		})
-		hotkeys("ctrl+y,command+y", () => {
+		hotkeys("ctrl+y,command+y,ctrl+shift+z,command+shift+z", () => {
 			Undo.redo()
 			return false
 		})
@@ -916,9 +906,7 @@ export class MainController {
 			return false
 		})
 		hotkeys("del, backspace", () => {
-			if (!SelectionController.instance.hasSelection()) {
-				this.switchMode(Modes.ERASE)
-			} else {
+			if (SelectionController.instance.hasSelection()) {
 				SelectionController.instance.removeSelection()
 				Undo.addState()
 			}
@@ -999,31 +987,6 @@ export class MainController {
 
 		this.symbols = componentsMetadata.flatMap((componentMetadata) => {
 			return new ComponentSymbol(componentMetadata)
-		})
-	}
-
-	/**
-	 * Init the mode change buttons.
-	 */
-	private initModeButtons() {
-		this.modeSwitchButtons.modeDragPan = document.getElementById("modeDragPan")
-		this.modeSwitchButtons.modeDrawLine = document.getElementById("modeDrawLine")
-		this.modeSwitchButtons.modeEraser = document.getElementById("modeEraser")
-
-		this.modeSwitchButtons.modeDragPan.addEventListener("click", () => this.switchMode(Modes.DRAG_PAN), {
-			passive: false,
-		})
-		this.modeSwitchButtons.modeDrawLine.addEventListener(
-			"click",
-			() => {
-				this.switchMode(Modes.DRAG_PAN)
-				this.modeSwitchButtons.modeDrawLine.classList.add("selected")
-				ComponentPlacer.instance.placeComponent(new WireComponent())
-			},
-			{ passive: false }
-		)
-		this.modeSwitchButtons.modeEraser.addEventListener("click", () => this.switchMode(Modes.ERASE), {
-			passive: false,
 		})
 	}
 
@@ -1559,17 +1522,10 @@ export class MainController {
 
 		switch (oldMode) {
 			case Modes.DRAG_PAN:
-				this.modeSwitchButtons.modeDragPan.classList.remove("selected")
 				CanvasController.instance.deactivatePanning()
 				SelectionController.instance.deactivateSelection()
 				break
-			case Modes.ERASE:
-				this.modeSwitchButtons.modeEraser.classList.remove("selected")
-				EraseController.instance.deactivate()
-				break
 			case Modes.COMPONENT:
-				this.modeSwitchButtons.modeDragPan.classList.remove("selected")
-				this.modeSwitchButtons.modeDrawLine.classList.remove("selected")
 				ComponentPlacer.instance.placeCancel()
 				CanvasController.instance.deactivatePanning()
 				break
@@ -1579,16 +1535,10 @@ export class MainController {
 
 		switch (newMode) {
 			case Modes.DRAG_PAN:
-				this.modeSwitchButtons.modeDragPan.classList.add("selected")
 				CanvasController.instance.activatePanning()
 				SelectionController.instance.activateSelection()
 				break
-			case Modes.ERASE:
-				this.modeSwitchButtons.modeEraser.classList.add("selected")
-				EraseController.instance.activate()
-				break
 			case Modes.COMPONENT:
-				this.modeSwitchButtons.modeDragPan.classList.add("selected")
 				CanvasController.instance.activatePanning()
 				break
 			default:

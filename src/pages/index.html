@@ -205,37 +205,9 @@
 							role="button"
 							data-bs-toggle="tooltip"
 							data-bs-placement="bottom"
-							data-bs-title="Open component drawer (Q)"
+							data-bs-title="Add a component (Q or I)"
 							aria-controls="leftOffcanvas"
 							>add</a
-						>
-						<div class="vr"></div>
-						<a
-							id="modeDragPan"
-							class="toolbarButton material-symbols-outlined selected"
-							role="button"
-							data-bs-toggle="tooltip"
-							data-bs-placement="bottom"
-							data-bs-title="Pan or zoom the canvas (Esc)"
-							>drag_pan</a
-						>
-						<a
-							id="modeDrawLine"
-							class="toolbarButton material-symbols-outlined"
-							role="button"
-							data-bs-toggle="tooltip"
-							data-bs-placement="bottom"
-							data-bs-title="Draw wires (W)"
-							>draw</a
-						>
-						<a
-							id="modeEraser"
-							class="toolbarButton material-symbols-outlined"
-							role="button"
-							data-bs-toggle="tooltip"
-							data-bs-placement="bottom"
-							data-bs-title="Erase components and wires (Del, Backspace)"
-							>ink_eraser</a
 						>
 						<div class="vr"></div>
 						<a
@@ -253,7 +225,7 @@
 							id="redoButton"
 							data-bs-toggle="tooltip"
 							data-bs-placement="bottom"
-							data-bs-title="Redo (Ctrl/⌘+Y)"
+							data-bs-title="Redo (Ctrl/⌘+Y or Ctrl/⌘+Shift+Z)"
 							>redo</a
 						>
 					</div>
@@ -391,8 +363,8 @@
 			<div class="componentPickerFooter d-flex justify-content-between gap-3 px-3 py-2 border-top small text-body-secondary">
 				<span id="componentPickerMode" class="font-monospace">-- INSERT --</span>
 				<span class="text-end">
-					<kbd>Enter</kbd> place · <kbd>Ctrl</kbd>+<kbd>J</kbd>/<kbd>K</kbd> move · <kbd>Esc</kbd> normal mode:
-					<kbd>h</kbd><kbd>j</kbd><kbd>k</kbd><kbd>l</kbd> <kbd>gg</kbd> <kbd>G</kbd> <kbd>/</kbd> <kbd>q</kbd>
+					<kbd>Enter</kbd> place · <kbd>Ctrl</kbd>+<kbd>J</kbd>/<kbd>K</kbd> move · <kbd>Esc</kbd> close · <kbd>Tab</kbd> normal mode:
+					<kbd>h</kbd><kbd>j</kbd><kbd>k</kbd><kbd>l</kbd> <kbd>gg</kbd> <kbd>G</kbd> <kbd>/</kbd>
 				</span>
 			</div>
 		</div>
@@ -711,7 +683,7 @@
 								<tr>
 									<td class="table-active">Cancel <b>wire</b></td>
 									<td>Press Esc</td>
-									<td>Click move tool</td>
+									<td>-</td>
 								</tr>
 							</tbody>
 							<tbody class="table-group-divider">
@@ -772,8 +744,13 @@
 								</tr>
 								<tr>
 									<td></td>
+									<td>Tab</td>
+									<td>Switch to normal mode: h/j/k/l move, gg/G first/last symbol, Tab, / or i search again</td>
+								</tr>
+								<tr>
+									<td></td>
 									<td>Esc</td>
-									<td>Normal mode: h/j/k/l move, gg/G first/last symbol, / or i search again, Esc or q close</td>
+									<td>Close the symbol picker (also q in normal mode)</td>
 								</tr>
 								<tr>
 									<td></td>
@@ -783,12 +760,12 @@
 								<tr>
 									<td></td>
 									<td>Del/Backspace</td>
-									<td>Erase components and wires</td>
+									<td>Delete the selection</td>
 								</tr>
 								<tr>
 									<td></td>
 									<td>Esc</td>
-									<td>Return to move tool/ cancel component placement</td>
+									<td>Cancel component placement or wire drawing</td>
 								</tr>
 							</tbody>
 							<tbody class="table-group-divider">
@@ -888,7 +865,7 @@
 								</tr>
 								<tr>
 									<td></td>
-									<td>Ctrl/⌘ + Y</td>
+									<td>Ctrl/⌘ + Y, Ctrl/⌘ + Shift + Z</td>
 									<td>Redo</td>
 								</tr>
 								<tr>
