@@ -1,0 +1,5 @@
+src/**
+node_modules/**
+.parcel-cache/**
+tsconfig.json
+*.vsix

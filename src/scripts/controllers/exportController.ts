@@ -116,35 +116,40 @@ export class ExportController {
 		// create extension select list
 		const extensions = [".tikz", ".tex", ".pgf"]
 
-		// actually export/create the string
-		{
-			let circuitElements = []
-			let requiredTikzLibraries: Set<string> = new Set<string>()
-			for (const circuitElement of MainController.instance.circuitComponents) {
-				circuitElement.requiredTikzLibraries().forEach((item) => requiredTikzLibraries.add(item))
-				circuitElements.push("\t" + circuitElement.toTikzString())
-			}
-			let libraryStr =
-				requiredTikzLibraries.size > 0 ?
-					"\\usetikzlibrary{" + requiredTikzLibraries.values().toArray().join(", ") + "}"
-				:	""
+		const text = this.getCircuiTikZString()
+		this.exportedContent.rows = text.split("\n").length
+		this.exportedContent.value = text
+		this.export(extensions)
+	}
 
-			const tikzSettings = EnvironmentVariableController.instance.getTikzSettings()
-			let arr = [
-				"\\begin{tikzpicture}" + "[" + ["transform shape"].concat(tikzSettings.environment).join(", ") + "]",
-				...tikzSettings.ctikzset.map((setting) => "\t\\ctikzset{" + setting + "}"),
-				"\t% Paths, nodes and wires:",
-				...circuitElements,
-				"\\end{tikzpicture}",
-			]
-			if (libraryStr) {
-				arr = [libraryStr].concat(arr)
-			}
-			this.exportedContent.rows = arr.length
-			this.exportedContent.value = arr.join("\n")
+	/**
+	 * the CircuiTikZ code of the whole drawing
+	 */
+	getCircuiTikZString(): string {
+		let circuitElements = []
+		let requiredTikzLibraries: Set<string> = new Set<string>()
+		for (const circuitElement of MainController.instance.circuitComponents) {
+			circuitElement.requiredTikzLibraries().forEach((item) => requiredTikzLibraries.add(item))
+			circuitElements.push("\t" + circuitElement.toTikzString())
+		}
+		let libraryStr =
+			requiredTikzLibraries.size > 0 ?
+				"\\usetikzlibrary{" + requiredTikzLibraries.values().toArray().join(", ") + "}"
+			:	""
+
+		const tikzSettings = EnvironmentVariableController.instance.getTikzSettings()
+		let arr = [
+			"\\begin{tikzpicture}" + "[" + ["transform shape"].concat(tikzSettings.environment).join(", ") + "]",
+			...tikzSettings.ctikzset.map((setting) => "\t\\ctikzset{" + setting + "}"),
+			"\t% Paths, nodes and wires:",
+			...circuitElements,
+			"\\end{tikzpicture}",
+		]
+		if (libraryStr) {
+			arr = [libraryStr].concat(arr)
 		}
 		this.usedIDs.clear()
-		this.export(extensions)
+		return arr.join("\n")
 	}
 
 	/**
@@ -153,6 +158,18 @@ export class ExportController {
 	exportSVG() {
 		this.heading.textContent = "Export SVG"
 		this.exportedContent.parentElement.style.display = this.defaultDisplay
+		this.getSVGString().then((textContent) => {
+			this.exportedContent.rows = textContent.split("\n").length
+			this.exportedContent.value = textContent
+			const extensions = [".svg", ".txt"]
+			this.export(extensions)
+		})
+	}
+
+	/**
+	 * the SVG code of the whole drawing
+	 */
+	getSVGString(): Promise<string> {
 		// prepare selection and bounding box
 		SelectionController.instance.selectAll()
 		SelectionController.instance.deactivateSelection()
@@ -214,7 +231,7 @@ export class ExportController {
 		let tempDiv = document.createElement("div")
 		tempDiv.appendChild(svgObj.node)
 		tempDiv.innerHTML = tempDiv.innerHTML.replaceAll(defaultStroke, "#000").replaceAll(defaultFill, "#fff")
-		prettier
+		const formatted = prettier
 			.format(tempDiv.innerHTML.replaceAll("<br>", "<br/>"), {
 				parser: "xml",
 				plugins: [parserXML],
@@ -222,16 +239,13 @@ export class ExportController {
 				singleAttributePerLine: true,
 				xmlWhitespaceSensitivity: "preserve",
 			})
-			.then((textContent) => {
-				this.exportedContent.rows = textContent.split("\n").length
-				this.exportedContent.value = textContent
-				const extensions = [".svg", ".txt"]
-				this.export(extensions)
+			.finally(() => {
 				SelectionController.instance.activateSelection()
 				tempDiv.remove()
 			})
 		MainController.instance.darkMode = colorTheme
 		MainController.instance.updateTheme()
+		return formatted
 	}
 
 	private export(extensions: string[]) {

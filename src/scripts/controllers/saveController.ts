@@ -19,6 +19,8 @@ export type SaveFileFormat = {
 	version: string
 	tikzSettings: GlobalTikzSettings
 	components: ComponentSaveObject[]
+	/** where the drawing was last exported to, relative to the save file (only used by the VS Code extension) */
+	exports?: { tikz?: string; svg?: string }
 }
 
 export let emtpySaveState: SaveFileFormat = {
@@ -73,6 +75,14 @@ export class SaveController {
 	}
 
 	save() {
+		ExportController.instance.exportJSON(this.serialize())
+	}
+
+	/**
+	 * the current drawing in the json save file format
+	 * @param exports kept unchanged from the loaded file
+	 */
+	serialize(exports?: SaveFileFormat["exports"]): string {
 		let componentArray = []
 		for (const component of MainController.instance.circuitComponents) {
 			componentArray.push(component.toJson())
@@ -83,8 +93,11 @@ export class SaveController {
 			tikzSettings: settingsData,
 			components: componentArray,
 		}
+		if (exports) {
+			data.exports = exports
+		}
 
-		ExportController.instance.exportJSON(JSON.stringify(data, null, 4))
+		return JSON.stringify(data, null, 4)
 	}
 
 	load() {

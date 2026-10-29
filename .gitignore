@@ -110,3 +110,10 @@
 
 # Zone.identifier
 *:Zone:Identifier
+
+# VS Code extension builds
+/vscode/node_modules/
+/vscode/media/
+/vscode/out/
+/vscode/.parcel-cache/
+*.vsix

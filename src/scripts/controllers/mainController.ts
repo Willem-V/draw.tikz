@@ -3,6 +3,7 @@ import { Button as _bootstrapButton, Collapse as _bootstrapCollapse, Offcanvas, 
 import "../utils/impSVGNumber"
 import { waitForElementLoaded } from "../utils/domWatcher"
 import { initComponentPickerNavigation } from "../utils/componentPicker"
+import { isVSCodeHost, keepShortcutsInWebview, onHostMessage, postToHost } from "../utils/host"
 import hotkeys from "hotkeys-js"
 import { version } from "../../../package.json"
 
@@ -91,6 +92,11 @@ export class MainController {
 
 	private tabID = -1
 
+	// VS Code extension: the text of the drawing's file as last sent to or received from the extension
+	private hostText: string = null
+	private loadingFromHost = false
+	private hostExports: SaveFileFormat["exports"]
+
 	mode = Modes.DRAG_PAN
 
 	private modeSwitchButtons = {
@@ -129,7 +135,12 @@ export class MainController {
 		const htmlElement = document.documentElement
 		const switchElement = document.getElementById("darkModeSwitch") as HTMLInputElement
 		const defaultTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-		this.currentTheme = localStorage.getItem("circuitikz-designer-theme") || defaultTheme
+		this.currentTheme =
+			isVSCodeHost ?
+				document.body.matches(".vscode-light, .vscode-high-contrast-light") ?
+					"light"
+				:	"dark"
+			:	localStorage.getItem("circuitikz-designer-theme") || defaultTheme
 		htmlElement.setAttribute("data-bs-theme", this.currentTheme)
 		this.darkModeLast = false
 		this.darkMode = this.currentTheme === "dark"
@@ -154,6 +165,10 @@ export class MainController {
 			fileExportName.placeholder =
 				MainController.instance.designName.value.replace(/[^a-z0-9]/gi, "_") || "Circuit"
 
+			if (!this.db) {
+				// no tabs in the VS Code extension
+				return
+			}
 			let tabsObjectStore = MainController.instance.db.transaction("tabs", "readwrite").objectStore("tabs")
 			tabsObjectStore.get(this.tabID).onsuccess = function (event) {
 				const data = (event.target as IDBRequest).result as TabState
@@ -172,16 +187,12 @@ export class MainController {
 		const exportCircuiTikZButton: HTMLButtonElement = document.getElementById(
 			"exportCircuiTikZButton"
 		) as HTMLButtonElement
-		exportCircuiTikZButton.addEventListener(
-			"click",
-			ExportController.instance.exportCircuiTikZ.bind(ExportController.instance),
-			{
-				passive: true,
-			}
-		)
+		exportCircuiTikZButton.addEventListener("click", () => this.exportCircuiTikZ(), {
+			passive: true,
+		})
 
 		const exportSVGButton: HTMLButtonElement = document.getElementById("exportSVGButton") as HTMLButtonElement
-		exportSVGButton.addEventListener("click", ExportController.instance.exportSVG.bind(ExportController.instance), {
+		exportSVGButton.addEventListener("click", () => this.exportSVG(), {
 			passive: true,
 		})
 
@@ -213,7 +224,11 @@ export class MainController {
 				.getElementById("canvas")
 				.addEventListener("contextmenu", (evt) => evt.preventDefault(), { passive: false })
 
-			this.addSaveStateManagement()
+			if (isVSCodeHost) {
+				this.initVSCodeHost()
+			} else {
+				this.addSaveStateManagement()
+			}
 
 			// prepare symbolDB for colorTheme
 			for (const g of this.symbolsSVG.defs().node.querySelectorAll("symbol>g")) {
@@ -636,6 +651,105 @@ export class MainController {
 		}
 	}
 
+	/**
+	 * set up the app for the VS Code extension: the drawing is loaded from and saved to its *.drawtikz.json file by the extension
+	 * instead of being stored in the browser
+	 */
+	private initVSCodeHost() {
+		keepShortcutsInWebview()
+		// saving is done by VS Code and there is only one drawing per editor
+		for (const element of [
+			document.getElementById("saveButton"),
+			document.querySelector('[data-bs-target="#tabManagementModal"]'),
+		]) {
+			element?.closest("li").classList.add("d-none")
+		}
+		const exportTitle = "to the file the drawing was last exported to, or choose one"
+		document
+			.getElementById("exportCircuiTikZButton")
+			.setAttribute("data-bs-title", "Export as CircuiTikZ code " + exportTitle + " (Ctrl/⌘ + E)")
+		document
+			.getElementById("exportSVGButton")
+			.setAttribute("data-bs-title", "Export as SVG " + exportTitle + " (Ctrl/⌘ + Shift + E)")
+		this.updateTooltips()
+
+		onHostMessage((message) => {
+			switch (message.type) {
+				case "load":
+					this.loadFromHost(message.text)
+					break
+				case "exported":
+					this.hostExports = { ...this.hostExports, [message.format]: message.path }
+					this.drawingChanged()
+					break
+			}
+		})
+		postToHost({ type: "ready" })
+	}
+
+	private loadFromHost(text: string) {
+		if (text == this.hostText) {
+			return
+		}
+		let saveFile: SaveFileFormat = emtpySaveState
+		if (text.trim()) {
+			try {
+				saveFile = JSON.parse(text)
+			} catch (e) {
+				// e.g. while the file is edited as text, keep the current drawing until the json is valid again
+				return
+			}
+		}
+		this.loadingFromHost = true
+		try {
+			while (this.circuitComponents.length > 0) {
+				this.removeComponent(this.circuitComponents[0])
+			}
+			this.hostExports = saveFile.exports
+			SaveController.instance.loadFromJSON(saveFile)
+		} finally {
+			this.loadingFromHost = false
+		}
+		this.hostText = text
+	}
+
+	/**
+	 * called after every change of the drawing (new undo state, undo and redo). Sends the drawing to the VS Code extension
+	 */
+	public drawingChanged() {
+		if (!isVSCodeHost || this.loadingFromHost || this.hostText === null) {
+			return
+		}
+		const text = SaveController.instance.serialize(this.hostExports)
+		if (text != this.hostText) {
+			this.hostText = text
+			postToHost({ type: "edit", text: text })
+		}
+	}
+
+	private exportCircuiTikZ() {
+		if (isVSCodeHost) {
+			postToHost({
+				type: "export",
+				format: "tikz",
+				content: ExportController.instance.getCircuiTikZString(),
+				path: this.hostExports?.tikz,
+			})
+		} else {
+			ExportController.instance.exportCircuiTikZ()
+		}
+	}
+
+	private exportSVG() {
+		if (isVSCodeHost) {
+			ExportController.instance.getSVGString().then((content) =>
+				postToHost({ type: "export", format: "svg", content: content, path: this.hostExports?.svg })
+			)
+		} else {
+			ExportController.instance.exportSVG()
+		}
+	}
+
 	public sendBroadcastMessage(type: string, payload?: any) {
 		const broadcastMessage: MessageData = {
 			type: type,
@@ -767,6 +881,10 @@ export class MainController {
 
 		//save/load
 		hotkeys("ctrl+s,command+s", () => {
+			if (isVSCodeHost) {
+				// VS Code saves the file
+				return
+			}
 			SaveController.instance.save()
 			return false
 		})
@@ -775,11 +893,11 @@ export class MainController {
 			return false
 		})
 		hotkeys("ctrl+e,command+e", () => {
-			ExportController.instance.exportCircuiTikZ()
+			this.exportCircuiTikZ()
 			return false
 		})
 		hotkeys("ctrl+shift+e,command+shift+e", () => {
-			ExportController.instance.exportSVG()
+			this.exportSVG()
 			return false
 		})
 
