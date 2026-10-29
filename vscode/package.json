@@ -2,7 +2,7 @@
 	"name": "draw-tikz",
 	"displayName": "draw.tikz",
 	"description": "Visual editor for CircuiTikZ/TikZ drawings: edit *.drawtikz.json files and export them to TikZ or SVG",
-	"version": "0.9.0",
+	"version": "0.2.0",
 	"publisher": "willem-v",
 	"license": "GPL-3.0-only",
 	"repository": {
