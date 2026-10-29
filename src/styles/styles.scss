@@ -5,6 +5,9 @@
 // Bootstrap
 // preset bootstrap (scss) variables:
 // scss-docs-start theme-color-variables
+// brand blue, also used in the logo (scripts/generateLogo.js)
+$primary: #00417b;
+
 @import url("https://cdn.jsdelivr.net/gh/vsalvino/computer-modern@main/fonts/serif.css");
 
 @import "dropdown_variables.scss";

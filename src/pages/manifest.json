@@ -4,7 +4,7 @@
 	"display": "standalone",
 	"name": "draw.tikz",
 	"start_url": ".",
-	"theme_color": "#00407A",
+	"theme_color": "#00417b",
 	"icons": [
 		{
 			"sizes": "192x192",

@@ -10,6 +10,10 @@
 		"url": "https://github.com/Willem-V/draw.tikz.git"
 	},
 	"icon": "media/icon.png",
+	"galleryBanner": {
+		"color": "#00417b",
+		"theme": "dark"
+	},
 	"engines": {
 		"vscode": "^1.90.0"
 	},
@@ -59,7 +63,7 @@
 	},
 	"scripts": {
 		"build:app": "cd .. && npx parcel build --public-url ./ --dist-dir vscode/media/app --cache-dir vscode/.parcel-cache --no-source-maps",
-		"build:icon": "node -e \"require('fs').mkdirSync('media',{recursive:true});require('fs').copyFileSync('../src/icons/android-icon-192x192.png','media/icon.png')\"",
+		"build:icon": "node -e \"require('fs').mkdirSync('media',{recursive:true});require('fs').copyFileSync('../src/icons/logo-icon.png','media/icon.png')\"",
 		"build:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=out/extension.js",
 		"build": "npm run build:app && npm run build:icon && npm run build:extension",
 		"package": "npm run build && vsce package",

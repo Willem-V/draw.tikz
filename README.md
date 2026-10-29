@@ -1,4 +1,9 @@
-# draw.tikz
+<h1>
+	<picture>
+		<source media="(prefers-color-scheme: dark)" srcset="src/icons/logo-dark.svg" />
+		<img src="src/icons/logo-light.svg" alt="draw.tikz" height="64" />
+	</picture>
+</h1>
 
 An interactive, visual editor for creating electrical circuit diagrams for LaTeX/CircuiTi*k*Z with ease.
 
