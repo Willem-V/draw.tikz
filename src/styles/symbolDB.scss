@@ -1,9 +1,36 @@
 // Styles for the left offcanvas resp. the symbol/components DB
 
-#leftOffcanvas {
-	max-width: 400px;
-	min-width: min(100vw, 300px);
-	width: 33.3vw;
+// the symbol picker pops up in the middle of the screen (like a picker in vim) instead of sliding in from the side
+#leftOffcanvas.offcanvas {
+	top: 50%;
+	left: 50%;
+	width: min(calc(100vw - 32px), 760px);
+	height: min(calc(100vh - 32px), 680px);
+	border: var(--bs-border-width) solid var(--bs-border-color);
+	border-radius: var(--bs-border-radius-lg);
+	box-shadow: var(--bs-box-shadow-lg);
+	opacity: 0;
+	transform: translate(-50%, -48%);
+	transition:
+		opacity 0.15s ease-out,
+		transform 0.15s ease-out;
+
+	&.showing,
+	&.show:not(.hiding) {
+		opacity: 1;
+		transform: translate(-50%, -50%);
+	}
+
+	&:focus {
+		outline: none;
+	}
+}
+
+// the symbol which is placed with Enter
+div.libComponent.libComponentActive {
+	outline: 2px solid var(--bs-primary);
+	outline-offset: 1px;
+	border-radius: var(--bs-border-radius-sm);
 }
 
 .offcanvas-search {
@@ -46,7 +73,7 @@
 .iconLibAccordionBody {
 	display: flex;
 	flex-flow: row wrap;
-	justify-content: space-between;
+	justify-content: flex-start;
 	align-items: center;
 	gap: 10px;
 }

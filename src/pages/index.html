@@ -364,8 +364,8 @@
 			<ul class="list-unstyled" id="subFloatingActionButtonContainer"></ul>
 		</div>
 
-		<!-- Left offcanvas (symbol DB) -->
-		<div id="leftOffcanvas" class="offcanvas offcanvas-start" tabindex="-1">
+		<!-- Symbol picker (symbol DB), pops up in the middle of the screen -->
+		<div id="leftOffcanvas" class="offcanvas" tabindex="-1">
 			<div class="offcanvas-header flex-column gap-3">
 				<div class="d-flex justify-content-between align-items-center w-100">
 					<h5 class="offcanvas-title" id="offcanvasLabel">Symbols</h5>
@@ -396,6 +396,13 @@
 			</div>
 			<div class="offcanvas-body pt-0">
 				<div class="accordion" id="leftOffcanvasAccordion"></div>
+			</div>
+			<div class="componentPickerFooter d-flex justify-content-between gap-3 px-3 py-2 border-top small text-body-secondary">
+				<span id="componentPickerMode" class="font-monospace">-- INSERT --</span>
+				<span class="text-end">
+					<kbd>Enter</kbd> place · <kbd>Ctrl</kbd>+<kbd>J</kbd>/<kbd>K</kbd> move · <kbd>Esc</kbd> normal mode:
+					<kbd>h</kbd><kbd>j</kbd><kbd>k</kbd><kbd>l</kbd> <kbd>gg</kbd> <kbd>G</kbd> <kbd>/</kbd> <kbd>q</kbd>
+				</span>
 			</div>
 		</div>
 
@@ -774,8 +781,18 @@
 							<tbody class="table-group-divider">
 								<tr>
 									<td>Modes</td>
-									<td>Q</td>
-									<td>Open component drawer</td>
+									<td>Q / I</td>
+									<td>Open the symbol picker (search with regex, Enter places the highlighted symbol)</td>
+								</tr>
+								<tr>
+									<td>Symbol picker</td>
+									<td>Ctrl + J / K, ↑ / ↓</td>
+									<td>Move the highlight while searching</td>
+								</tr>
+								<tr>
+									<td></td>
+									<td>Esc</td>
+									<td>Normal mode: h/j/k/l move, gg/G first/last symbol, / or i search again, Esc or q close</td>
 								</tr>
 								<tr>
 									<td></td>

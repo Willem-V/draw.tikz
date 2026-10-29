@@ -2,6 +2,7 @@ import * as SVG from "@svgdotjs/svg.js"
 import { Button as _bootstrapButton, Collapse as _bootstrapCollapse, Offcanvas, Tooltip, Modal } from "bootstrap"
 import "../utils/impSVGNumber"
 import { waitForElementLoaded } from "../utils/domWatcher"
+import { initComponentPickerNavigation } from "../utils/componentPicker"
 import hotkeys from "hotkeys-js"
 import { version } from "../../../package.json"
 
@@ -783,7 +784,7 @@ export class MainController {
 		})
 
 		// mode change
-		hotkeys("q", () => {
+		hotkeys("q,i", () => {
 			document.getElementById("addComponentButton").dispatchEvent(new MouseEvent("click"))
 			return false
 		})
@@ -1230,9 +1231,12 @@ export class MainController {
 	 */
 	private async initAddComponentOffcanvas() {
 		const leftOffcanvas: HTMLDivElement = document.getElementById("leftOffcanvas") as HTMLDivElement
-		const leftOffcanvasOC = new Offcanvas(leftOffcanvas)
+		// Esc is handled by the picker navigation (it switches to the normal mode first)
+		const leftOffcanvasOC = new Offcanvas(leftOffcanvas, { keyboard: false })
 		document.getElementById("componentFilterInput").addEventListener("input", this.filterComponents)
 		document.getElementById("filterRegexButton").addEventListener("click", this.filterComponents)
+		// after the filter listeners, such that the highlight starts at the first match
+		initComponentPickerNavigation(leftOffcanvas, leftOffcanvasOC)
 
 		const addComponentButton: HTMLAnchorElement = document.getElementById("addComponentButton") as HTMLAnchorElement
 		addComponentButton.addEventListener(
