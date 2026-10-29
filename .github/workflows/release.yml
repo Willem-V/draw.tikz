@@ -1,0 +1,48 @@
+# A version tag (vX.Y.Z, matching vscode/package.json) builds the VS Code extension and attaches it to a GitHub Release
+name: Release extension
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  vsix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            vscode/package-lock.json
+      - name: Check that the tag matches the extension version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          EXTENSION_VERSION=$(node -p "require('./vscode/package.json').version")
+          if [ "$EXTENSION_VERSION" != "$VERSION" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match vscode/package.json version $EXTENSION_VERSION"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - run: npm ci --no-audit --no-fund
+      - name: Package the extension
+        working-directory: vscode
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          npx vsce package -o "../draw-tikz-$VERSION.vsix"
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" "draw-tikz-$VERSION.vsix"
+          --title "draw.tikz $GITHUB_REF_NAME"
+          --notes "VS Code extension draw-tikz-$VERSION.vsix. Install it with Extensions > ... > Install from VSIX."
+      # Public publishing, once the tokens are added as repository secrets:
+      # - run: npx vsce publish --packagePath "draw-tikz-$VERSION.vsix" -p "${{ secrets.VSCE_PAT }}"
+      # - run: npx ovsx publish "draw-tikz-$VERSION.vsix" -p "${{ secrets.OVSX_PAT }}"

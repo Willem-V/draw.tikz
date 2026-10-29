@@ -3,11 +3,11 @@
 	"displayName": "draw.tikz",
 	"description": "Visual editor for CircuiTikZ/TikZ drawings: edit *.drawtikz.json files and export them to TikZ or SVG",
 	"version": "0.1.0",
-	"publisher": "micas",
+	"publisher": "willem-v",
 	"license": "GPL-3.0-only",
 	"repository": {
 		"type": "git",
-		"url": "https://gitlab.esat.kuleuven.be/willem.vandesteene/draw.tikz.git"
+		"url": "https://github.com/Willem-V/draw.tikz.git"
 	},
 	"icon": "media/icon.png",
 	"engines": {

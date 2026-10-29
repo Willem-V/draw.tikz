@@ -2,19 +2,31 @@
 
 An interactive, visual editor for creating electrical circuit diagrams for LaTeX/CircuiTi*k*Z with ease.
 
-**Use it online: <https://micas.pages.esat.kuleuven.cloud/>** (log in with your ESAT GitLab account)
-
 draw.tikz is a fork of [CircuiTi*k*Z-Designer](https://github.com/Circuit2TikZ/CircuiTikZ-Designer) by Manuel Kirzinger, Philipp Wiedemann and Christof Pfannenmüller (FAU), licensed under [GPL-3.0](LICENSE). The goal is to extend it step by step towards a general GUI for Ti*k*Z drawings.
 
-## Todos
+## Two ways to use it
 
-- why not always save in .tikz? why is json needed? -> put 
-- save groups of own components
-- Import external Tikz files if possible
-- Customizable saving: choose a project folder where the .json and .tikz are autosaved automatically (easier to retrieve, no loss when browser storage is overwritten)
+### 1. Online
+
+**<https://willem-v.github.io/draw.tikz/>**
+
+Drawings are stored in the browser (per address). Save your drawing regularly as a JSON file (Ctrl/⌘ + S) to be safe.
+
+### 2. VS Code extension
+
+The extension opens `*.drawtikz.json` files in the draw.tikz editor inside VS Code, so a drawing is a normal file that lives (and is versioned) next to your LaTeX project.
+
+1. Download `draw-tikz-<version>.vsix` from the latest [release](https://github.com/Willem-V/draw.tikz/releases)
+2. In VS Code: Extensions view > `...` > **Install from VSIX...** (or `code --install-extension draw-tikz-<version>.vsix`)
+3. Right-click a folder in the Explorer > **New drawing** (or the command `draw.tikz: New drawing`), or open any existing `*.drawtikz.json`
+
+Saving and undo/redo go through VS Code like for any other file. Exporting to Ti*k*Z or SVG writes the file into the workspace: the first export of a drawing suggests the folder from the setting `drawtikz.defaultExportFolder` (default `fig`), later exports overwrite the same file.
+
+All controls of the editor are explained in the help menu (circled question mark in the top right corner).
 
 ## Changes compared to CircuiTi*k*Z-Designer
 
+- **VS Code extension:** edit `*.drawtikz.json` files in VS Code and export straight into the LaTeX project (see above)
 - **Variable sources:** a "Variable" switch on all voltage and current sources draws a diagonal arrow over the symbol (also exported to Ti*k*Z)
 - **Transistor arrow position:** environment setting for `\ctikzset{transistors/arrow pos=...}`, defaulting to the end of the terminal. The canvas symbols for this are generated with [scripts/generateArrowEndSymbols.py](scripts/generateArrowEndSymbols.py)
 - **Enable axes:** the axes can be hidden like the grid; the grid setting is now also restored correctly
@@ -29,59 +41,64 @@ draw.tikz is a fork of [CircuiTi*k*Z-Designer](https://github.com/Circuit2TikZ/C
 - **Symbol picker:** the symbol panel pops up in the middle of the screen (Q or I) and can be used with the keyboard like a picker in vim: type to search (fuzzy or regex), Enter places the highlighted symbol, Ctrl+J/K moves while typing, Esc switches to normal mode with h/j/k/l, gg/G and / (Esc or q closes)
 - **SVG export for Office:** text inside symbols (e.g. T, Q and Q̄ on flip-flops) and labels no longer disappear when the exported SVG is used in PowerPoint or Word
 - **Grid switch** at startup now matches whether the grid is visible
-- No Google Analytics
+- No Google Analytics, no Electron desktop app
 
-## Overview
+## Features
 
-draw.tikz bridges the gap between visual circuit design and precise LaTeX code, letting you design, customize, and export diagrams without manually writing TikZ commands.
-Whether you’re preparing academic papers, teaching materials, or engineering documentation, it provides:
+- **Visual circuit design** with multi-tab support and component grouping
+- **Component library** with most CircuiTi*k*Z elements plus Ti*k*Z shapes like rectangles, ellipses and arrows
+- **Export** to clean CircuiTi*k*Z code and to SVG
+- **Editing:** rotate, scale, align, distribute and snap components; switch component variants and adjust their properties in the properties window
+- **MathJax** math in text components, rendered live
 
-- A clean, intuitive interface for fast diagram creation
-- An extensive component library for all your circuit needs
-- Real-time previews and instant export to high-quality LaTeX code
+## Development
 
-|                 Edit in draw.tikz                 |            Export to compilable Ti*k*Z code            |
-| :-----------------------------------------------: | :----------------------------------------------------: |
-| ![sallen-key edit](./examples/sallen-key.png) | ![sallen-key export](./examples/sallen-key_export.png) |
+Requires [Node.js](https://nodejs.org/) v20.
 
-|               Use it in your LaTeX project!                |
-| :--------------------------------------------------------: |
-| ![sallen-key overleaf](./examples/sallen-key_overleaf.png) |
+**Web app:** run `npm ci`, then `npm start` serves the working tree on <http://localhost:1234> and reloads on every change.
 
-## Key Features
+**VS Code extension** (in [vscode/](vscode)): the extension bundles the built web app.
 
-- **Visual Circuit Design:** Intuitive interface with multi-tab support and component grouping
-- **Wide Component Library:** Includes most circuit elements plus some tikz components like rectangles, ellipses and arrows
-- **Export Ready:** Generate clean LaTeX/TikZ code and compatible SVG exports for seamless document integration
-- **Advanced Editing:** Rotate, scale, align, distribute, and snap components with clear visuals and flexible editing capabilities
-- **Component Variants:** Easily switch between different versions of components and adjust their properties via the properties window
-- **Cross-Platform Friendly:** Dark mode and mobile support for comfortable online editing anywhere
-- **MathJax Support:** Write MathJax math expressions directly inside text components with real-time rendering
+```sh
+npm ci                      # in the project root, the extension build uses its parcel
+cd vscode
+npm ci
+npm run package             # builds the app and extension, writes draw-tikz-<version>.vsix
+code --install-extension draw-tikz-<version>.vsix
+```
 
-## How to use
+`npm run check` type-checks the extension code.
 
-All controls of the application are explained in the help menu in the top right corner via the circled questionmark in the application itself.
+## Hosting and releases (GitHub Actions)
 
-Drawings are stored in the browser (per address). Save your drawing regularly as a JSON file (Ctrl/⌘ + S) to be safe.
+Two workflows in [.github/workflows](.github/workflows):
 
-## Use locally (For debugging for example)
+- **[pages.yml](.github/workflows/pages.yml):** every push to `main` builds the web app and publishes it with GitHub Pages (Settings > Pages > Source: GitHub Actions)
+- **[release.yml](.github/workflows/release.yml):** a version tag `vX.Y.Z` builds the VS Code extension and creates a GitHub Release with the `.vsix` attached
 
-1. Have [Node.js](https://nodejs.org/) (v20) installed
-2. Clone the repository
-3. Run `npm ci` in the project directory
-4. `npm start` serves the working tree on <http://localhost:1234> and reloads on every change. 
+To release a new extension version:
 
-## Hosting (GitLab Pages)
+1. Bump `version` in [vscode/package.json](vscode/package.json) (the workflow fails if the tag does not match it) and commit
+2. `git tag vX.Y.Z && git push origin main vX.Y.Z`
 
-[.gitlab-ci.yml](.gitlab-ci.yml) builds the app and publishes it with GitLab Pages on every push to `main`. The job needs a GitLab runner with the Docker executor. To run one on your own machine:
+GitHub Actions is free for public repositories.
 
-1. In GitLab: Settings > CI/CD > Runners > New project runner, tick "Run untagged jobs" and copy the token (`glrt-...`)
-2. Run `scripts/gitlab-runner.sh` (installs, registers and starts the runner; asks for the token). `scripts/gitlab-runner.sh status` and `scripts/gitlab-runner.sh stop` check or stop it.
+### Publishing publicly (later)
 
-The runner is only needed for building; the published site stays online when the runner is off.
+The release workflow already contains the publish steps as comments:
+
+- **VS Code Marketplace:** create the publisher `willem-v` (the `publisher` in `vscode/package.json`) at <https://marketplace.visualstudio.com/manage>, create an Azure DevOps personal access token with scope Marketplace > Manage and organization "All accessible organizations" and add it as repository secret `VSCE_PAT`
+- **Open VSX** (VSCodium, Cursor, ...): create a token at <https://open-vsx.org> and add it as repository secret `OVSX_PAT`
+
+The Marketplace page shows `vscode/README.md`; images there must use `https` URLs (no SVG).
 
 ## Contributing
 
-Report bugs and request features in the issues of the [GitLab project](https://gitlab.esat.kuleuven.be/willem.vandesteene/draw.tikz). Please always provide steps on how to reproduce a bug.
+Report bugs and request features in the [GitHub issues](https://github.com/Willem-V/draw.tikz/issues). Please always provide steps on how to reproduce a bug.
 
 Bugs that also occur in the original CircuiTi*k*Z-Designer can be reported [upstream](https://github.com/Circuit2TikZ/CircuiTikZ-Designer/issues).
+
+## Todos
+
+- Save groups of own components
+- Import external Ti*k*Z files if possible
