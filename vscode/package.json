@@ -2,7 +2,7 @@
 	"name": "draw-tikz",
 	"displayName": "draw.tikz",
 	"description": "Visual editor for CircuiTikZ/TikZ drawings: edit *.drawtikz.json files and export them to TikZ or SVG",
-	"version": "0.1.0",
+	"version": "0.9.0",
 	"publisher": "willem-v",
 	"license": "GPL-3.0-only",
 	"repository": {
@@ -62,7 +62,7 @@
 		}
 	},
 	"scripts": {
-		"build:app": "cd .. && npx parcel build --public-url ./ --dist-dir vscode/media/app --cache-dir vscode/.parcel-cache --no-source-maps",
+		"build:app": "node -e \"require('fs').rmSync('media/app',{recursive:true,force:true})\" && cd .. && npx parcel build --public-url ./ --dist-dir vscode/media/app --cache-dir vscode/.parcel-cache --no-source-maps",
 		"build:icon": "node -e \"require('fs').mkdirSync('media',{recursive:true});require('fs').copyFileSync('../src/icons/logo-icon.png','media/icon.png')\"",
 		"build:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=out/extension.js",
 		"build": "npm run build:app && npm run build:icon && npm run build:extension",
@@ -72,7 +72,7 @@
 	"devDependencies": {
 		"@types/node": "^20.19.0",
 		"@types/vscode": "~1.90.0",
-		"@vscode/vsce": "^3.6.0",
+		"@vscode/vsce": "^4.1.0",
 		"esbuild": "^0.25.0",
 		"typescript": "^5.9.2"
 	}

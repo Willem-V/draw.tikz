@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  # Trusted Publishing to the VS Code Marketplace (OIDC, no stored token)
+  id-token: write
 
 jobs:
   vsix:
@@ -43,6 +45,9 @@ jobs:
           gh release create "$GITHUB_REF_NAME" "draw-tikz-$VERSION.vsix"
           --title "draw.tikz $GITHUB_REF_NAME"
           --notes "VS Code extension draw-tikz-$VERSION.vsix. Install it with Extensions > ... > Install from VSIX."
-      # Public publishing, once the tokens are added as repository secrets:
-      # - run: npx vsce publish --packagePath "draw-tikz-$VERSION.vsix" -p "${{ secrets.VSCE_PAT }}"
+      # needs a Trusted Publishing policy for this repository and release.yml on the willem-v publisher (marketplace.visualstudio.com/manage)
+      - name: Publish to the VS Code Marketplace
+        working-directory: vscode
+        run: npx vsce publish --oidc --packagePath "../draw-tikz-$VERSION.vsix"
+      # Open VSX, once its token is added as repository secret:
       # - run: npx ovsx publish "draw-tikz-$VERSION.vsix" -p "${{ secrets.OVSX_PAT }}"

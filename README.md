@@ -79,7 +79,7 @@ code --install-extension draw-tikz-<version>.vsix
 Two workflows in [.github/workflows](.github/workflows):
 
 - **[pages.yml](.github/workflows/pages.yml):** every push to `main` builds the web app and publishes it with GitHub Pages (Settings > Pages > Source: GitHub Actions)
-- **[release.yml](.github/workflows/release.yml):** a version tag `vX.Y.Z` builds the VS Code extension and creates a GitHub Release with the `.vsix` attached
+- **[release.yml](.github/workflows/release.yml):** a version tag `vX.Y.Z` builds the VS Code extension, creates a GitHub Release with the `.vsix` attached and publishes it to the VS Code Marketplace
 
 To release a new extension version:
 
@@ -88,14 +88,11 @@ To release a new extension version:
 
 GitHub Actions is free for public repositories.
 
-### Publishing publicly (later)
+### VS Code Marketplace
 
-The release workflow already contains the publish steps as comments:
+The release workflow also publishes the extension to the [VS Code Marketplace](https://marketplace.visualstudio.com/manage) under the publisher `willem-v`, with Trusted Publishing (OpenID Connect from GitHub Actions, no stored token). This needs a Trusted Publishing policy on the publisher for owner `Willem-V`, repository `draw.tikz` and workflow `release.yml`. The Marketplace page shows `vscode/README.md`; images there must use `https` URLs (no SVG).
 
-- **VS Code Marketplace:** create the publisher `willem-v` (the `publisher` in `vscode/package.json`) at <https://marketplace.visualstudio.com/manage>, create an Azure DevOps personal access token with scope Marketplace > Manage and organization "All accessible organizations" and add it as repository secret `VSCE_PAT`
-- **Open VSX** (VSCodium, Cursor, ...): create a token at <https://open-vsx.org> and add it as repository secret `OVSX_PAT`
-
-The Marketplace page shows `vscode/README.md`; images there must use `https` URLs (no SVG).
+**Open VSX** (VSCodium, Cursor, ...) is prepared as a comment in the workflow: create a token at <https://open-vsx.org>, add it as repository secret `OVSX_PAT` and uncomment the step.
 
 ## Contributing
 
