@@ -12,6 +12,7 @@ import {
 	SelectionController,
 	Undo,
 } from "../internal"
+import { ComponentLibrary } from "../utils/componentLibrary"
 
 export type FormEntry = {
 	originalObject: object
@@ -195,9 +196,15 @@ export class PropertyController {
 
 		rows.push(new SectionHeaderProperty("Grouping").buildHTML())
 		let grouping = new ButtonGridProperty(
-			1,
-			[["Group", ""]],
-			[(ev) => GroupComponent.group(SelectionController.instance.currentlySelectedComponents)]
+			2,
+			[
+				["Group", ""],
+				["Save as component", ""],
+			],
+			[
+				(ev) => GroupComponent.group(SelectionController.instance.currentlySelectedComponents),
+				(ev) => ComponentLibrary.instance.save(SelectionController.instance.currentlySelectedComponents),
+			]
 		)
 		rows.push(grouping.buildHTML())
 

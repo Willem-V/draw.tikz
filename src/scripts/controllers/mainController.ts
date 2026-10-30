@@ -3,6 +3,7 @@ import { Button as _bootstrapButton, Collapse as _bootstrapCollapse, Offcanvas, 
 import "../utils/impSVGNumber"
 import { waitForElementLoaded } from "../utils/domWatcher"
 import { initComponentPickerNavigation } from "../utils/componentPicker"
+import { addLibraryToPicker, ComponentLibrary } from "../utils/componentLibrary"
 import { isVSCodeHost, keepShortcutsInWebview, onHostMessage, postToHost } from "../utils/host"
 import hotkeys from "hotkeys-js"
 import { version } from "../../../package.json"
@@ -674,6 +675,12 @@ export class MainController {
 				case "exported":
 					this.hostExports = { ...this.hostExports, [message.format]: message.path }
 					this.drawingChanged()
+					break
+				case "library":
+					ComponentLibrary.instance.setEntries(message.components)
+					break
+				case "placeComponent":
+					ComponentLibrary.instance.startPlacing(message.component)
 					break
 			}
 		})
@@ -1357,6 +1364,7 @@ export class MainController {
 		)
 
 		this.addShapeComponentsToOffcanvas(leftOffcanvasAccordion, leftOffcanvasOC)
+		addLibraryToPicker(leftOffcanvasAccordion, () => leftOffcanvasOC.hide())
 
 		for (const [groupName, symbols] of groupedSymbols.entries()) {
 			const collapseGroupID = "collapseGroup-" + groupName.replace(/[^\d\w\-\_]+/gi, "-")

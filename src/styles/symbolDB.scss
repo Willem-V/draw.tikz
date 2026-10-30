@@ -89,3 +89,38 @@ div.libComponent {
 div.libComponent:hover {
 	box-shadow: 3px 3px 7px 1px #cccc;
 }
+
+// reusable components ("My components" group, see utils/componentLibrary.ts)
+div.libComponent.libraryComponent {
+	position: relative;
+	// the preview svg has no size of its own, only a viewBox
+	> svg {
+		height: 48px;
+		width: auto;
+		max-width: 160px;
+	}
+}
+
+div.libComponent.libraryComponentText {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	min-height: 32px;
+	padding: 2px 8px;
+}
+
+// only shown on hover, so the previews stay clean
+.libraryComponentRemove {
+	position: absolute;
+	top: -4px;
+	right: -4px;
+	padding: 2px;
+	font-size: 0.6rem;
+	background-color: var(--bs-body-bg);
+	border-radius: 50%;
+	display: none;
+
+	.libraryComponent:hover > & {
+		display: block;
+	}
+}

@@ -57,6 +57,11 @@
 					"type": "string",
 					"default": "fig",
 					"description": "Folder (relative to the workspace folder) suggested when a drawing is exported for the first time"
+				},
+				"drawtikz.componentFolder": {
+					"type": "string",
+					"default": "components",
+					"description": "Folder (relative to the workspace folder) with reusable components: its *.drawtikz.json files are listed under \"My components\" in the symbol picker"
 				}
 			}
 		}

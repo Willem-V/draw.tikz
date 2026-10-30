@@ -27,6 +27,8 @@ The extension opens `*.drawtikz.json` files in the draw.tikz editor inside VS Co
 
 Saving and undo/redo go through VS Code like for any other file. Exporting to Ti*k*Z or SVG writes the file into the workspace: the first export of a drawing suggests the folder from the setting `drawtikz.defaultExportFolder` (default `fig`), later exports overwrite the same file.
 
+Reusable components ("Save as component", see below) are saved into the folder from the setting `drawtikz.componentFolder` (default `components`). All drawings in that folder are listed under "My components" in the symbol picker and update when the files change.
+
 All controls of the editor are explained in the help menu (circled question mark in the top right corner).
 
 ## Changes compared to CircuiTi*k*Z-Designer
@@ -48,6 +50,7 @@ All controls of the editor are explained in the help menu (circled question mark
 - **Grid switch** at startup now matches whether the grid is visible
 - **Import Ti*k*Z and JSON** (Ctrl/⌘ + O, or Ctrl/⌘ + Shift + O to paste code): load a file or pasted code and replace the drawing or add it to the current one, with a report of everything that could not be converted. Based on the importer that was briefly in CircuiTi*k*Z-Designer, extended with anchors (`(M1.drain)`, `(ic.pin 3)`, `anchor=D`), shifted coordinates, rotation/mirroring, labels, rectangles/ellipses/circles with their line and fill style, and the text of rectangles, so the Ti*k*Z export of this app imports again without changes. Run the importer tests with `npm run test:import`
 - **Wire modes** like in EDA/PCB tools: while drawing a wire, Space switches between orthogonal (horizontal/vertical with one bend), 45° (a diagonal and a straight part) and free (any angle); / flips the bend to the other end of the segment. The mode is remembered
+- **Reusable components:** select a part of a drawing and click "Save as component" (properties panel, also on a group) to save it as its own `.drawtikz.json` file. It shows up under "My components" in the symbol picker and is placed like a symbol: it follows the cursor, snaps to the grid, can be rotated and flipped, and a click places it as a group. "Import file..." in the same group places any drawing. In the browser the components are kept in the browser storage; in VS Code they are the files in the component folder of the workspace
 - No Google Analytics, no Electron desktop app
 
 ## Features

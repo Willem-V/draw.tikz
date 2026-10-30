@@ -1,3 +1,5 @@
+import type { LibraryEntry } from "./componentLibrary"
+
 /**
  * Communication with the program hosting the app. In the browser there is no host. In the VS Code extension the app runs
  * in a webview and the drawing is stored in a *.drawtikz.json file of the workspace, which the extension reads and writes.
@@ -8,12 +10,19 @@ export type ToHostMessage =
 	| { type: "ready" }
 	| { type: "edit"; text: string }
 	| { type: "export"; format: ExportFormat; content: string; path?: string }
+	// reusable components (utils/componentLibrary.ts): save a component file, choose a file to place
+	| { type: "saveComponent"; content: string }
+	| { type: "pickComponent" }
 
 /** messages from the VS Code extension to the app */
 export type FromHostMessage =
 	| { type: "load"; text: string }
 	// path relative to the drawing's file
 	| { type: "exported"; format: ExportFormat; path: string }
+	// all files in the component folder of the workspace, sent again after every change
+	| { type: "library"; components: LibraryEntry[] }
+	// the file chosen after pickComponent
+	| { type: "placeComponent"; component: LibraryEntry }
 
 export type ExportFormat = "tikz" | "svg"
 
