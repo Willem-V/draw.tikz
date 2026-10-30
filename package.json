@@ -1,6 +1,6 @@
 {
 	"name": "draw.tikz",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"private": "true",
 	"description": "An interactive, visual editor for creating TikZ drawings for LaTeX.",
 	"license": "GPL-3.0-only",
@@ -17,6 +17,8 @@
 	],
 	"source": "src/pages/index.html",
 	"scripts": {
+		"prebuild": "node scripts/buildInfo.mjs",
+		"prestart": "node scripts/buildInfo.mjs",
 		"build": "parcel build --public-url ./",
 		"update": "npx npm-check-updates -u",
 		"prepack": "npm run build",

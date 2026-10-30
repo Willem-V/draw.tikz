@@ -8,6 +8,7 @@ import { addLibraryToPicker, ComponentLibrary } from "../utils/componentLibrary"
 import { isVSCodeHost, keepShortcutsInWebview, onHostMessage, postToHost } from "../utils/host"
 import hotkeys from "hotkeys-js"
 import { version } from "../../../package.json"
+import { buildInfo } from "../utils/buildInfo"
 
 import {
 	CanvasController,
@@ -150,7 +151,7 @@ export class MainController {
 		MainController.appVersion = version
 		document.addEventListener("DOMContentLoaded", () => {
 			for (const element of document.getElementsByClassName("version")) {
-				element.textContent = "v" + version.replace(/\.0$/, "")
+				element.textContent = "v" + version + (buildInfo ? ` (${buildInfo})` : "")
 			}
 		})
 
