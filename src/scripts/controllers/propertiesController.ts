@@ -306,47 +306,9 @@ export class PropertyController {
 		this.viewProperties.classList.remove("d-none")
 		this.propertiesTitle.innerText = "General settings"
 
-		let minorSlider = document.getElementById("minorSliderInput") as HTMLInputElement
-		minorSlider.value = CanvasController.instance.majorGridSubdivisions.toString()
-
-		let majorSlider = document.getElementById("majorSliderInput") as HTMLInputElement
-		majorSlider.value = CanvasController.instance.majorGridSizecm.toString()
-
-		minorSlider.addEventListener("input", (ev) => {
-			this.changeGrid(CanvasController.instance.majorGridSizecm, Number.parseFloat(minorSlider.value))
-		})
-
-		majorSlider.addEventListener("input", (ev) => {
-			this.changeGrid(Number.parseFloat(majorSlider.value), CanvasController.instance.majorGridSubdivisions)
-		})
-
-		this.changeGrid(CanvasController.instance.majorGridSizecm, CanvasController.instance.majorGridSubdivisions)
-
 		if (!document.getElementById("envVarView")) {
 			document.getElementById("view-properties").appendChild(EnvironmentVariableController.instance.getHTML())
 		}
-	}
-
-	public setSliderValues(majorSizecm: number, majorSubdivisions: number) {
-		let minorSlider = document.getElementById("minorSliderInput") as HTMLInputElement
-		minorSlider.value = majorSubdivisions.toString()
-		let majorSlider = document.getElementById("majorSliderInput") as HTMLInputElement
-		majorSlider.value = majorSizecm.toString()
-		this.changeGrid(majorSizecm, majorSubdivisions)
-	}
-
-	private changeGrid(majorSizecm: number, majorSubdivisions: number) {
-		CanvasController.instance.changeGrid(majorSizecm, majorSubdivisions)
-
-		let majorLabel = document.getElementById("majorLabel")
-		majorLabel.innerText = majorSizecm + " cm"
-
-		let minorLabel = document.getElementById("minorLabel")
-		minorLabel.innerText = majorSubdivisions.toString()
-
-		let gridInfo = document.getElementById("gridInfo")
-		gridInfo.innerText =
-			(majorSizecm / majorSubdivisions).toLocaleString(undefined, { maximumFractionDigits: 2 }) + " cm"
 	}
 
 	private clearForm() {

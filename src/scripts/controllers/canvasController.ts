@@ -7,7 +7,6 @@ import {
 	MainController,
 	SelectionController,
 	CanvasSettings,
-	PropertyController,
 } from "../internal"
 
 type PanningEventDetail = {
@@ -51,12 +50,15 @@ export class CanvasController {
 	 */
 	public yAxis: SVG.Line
 
-	/** Distance between major grid lines
+	/**
+	 * Distance between two grid points in cm, the same for every drawing. The pins of the symbols can be put on this grid
+	 * by small size changes. The grid itself is drawn by the patterns in canvas.svg (major lines every 1cm).
 	 */
-	public majorGridSizecm = 1
-	/** How many minor grid lines are drawn for every major grid line
-	 */
-	public majorGridSubdivisions = 4
+	public static readonly gridSpacingcm = 0.25
+	/** Distance between two grid points in px */
+	public static get gridSpacing(): number {
+		return new SVG.Number(CanvasController.gridSpacingcm, "cm").convertToUnit("px").value
+	}
 	public gridVisible = true
 	public axesVisible = true
 
@@ -205,9 +207,6 @@ export class CanvasController {
 	}
 
 	public setSettings(settings: CanvasSettings) {
-		this.majorGridSizecm = settings.majorGridSizecm || this.majorGridSizecm
-		this.majorGridSubdivisions = settings.majorGridSubdivisions || this.majorGridSubdivisions
-		PropertyController.instance.setSliderValues(this.majorGridSizecm, this.majorGridSubdivisions)
 		this.gridVisible = settings.gridVisible ?? this.gridVisible
 		let gridVisibleToggle = document.getElementById("gridVisible") as HTMLInputElement
 		gridVisibleToggle.checked = this.gridVisible
@@ -450,34 +449,6 @@ export class CanvasController {
 		return (event instanceof MouseEvent && event.shiftKey) || !snap ?
 				pt
 			:	SnapController.instance.snapPoint(pt, undefined)
-	}
-
-	/** how the grid should be drawn
-	 * @param {number} majorSizecm the distance between two major grid lines in cm
-	 * @param {int} majorSubdivisions how many minor grid lines are drawn per major grid line (>=1)
-	 */
-	public changeGrid(majorSizecm: number, majorSubdivisions: number) {
-		this.majorGridSubdivisions = majorSubdivisions
-		this.majorGridSizecm = majorSizecm
-		let minorGridDistance = majorSizecm / majorSubdivisions
-		const snapDistanceNum = new SVG.Number(minorGridDistance, "cm").toString()
-		const snapDistancePx = new SVG.Number(minorGridDistance, "cm").convertToUnit("px").value
-		const majorDistanceNum = new SVG.Number(majorSizecm, "cm").toString()
-		const majorDistancePx = new SVG.Number(majorSizecm, "cm").convertToUnit("px").value
-
-		// change small grid
-		const minorGrid = document.getElementById("smallGridPattern")
-		minorGrid.setAttribute("width", snapDistanceNum)
-		minorGrid.setAttribute("height", snapDistanceNum)
-		minorGrid.children[0]?.setAttribute("d", `M ${snapDistancePx} 0 L 0 0 0 ${snapDistancePx}`)
-
-		// change large grid
-		const majorGrid = document.getElementById("gridPattern")
-		majorGrid.setAttribute("width", majorDistanceNum)
-		majorGrid.setAttribute("height", majorDistanceNum)
-		majorGrid.children[0]?.setAttribute("width", majorDistanceNum)
-		majorGrid.children[0]?.setAttribute("height", majorDistanceNum)
-		majorGrid.children[1]?.setAttribute("d", `M ${majorDistancePx} 0 L 0 0 0 ${majorDistancePx}`)
 	}
 
 	/**
