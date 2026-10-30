@@ -12,6 +12,7 @@ import {
 	Undo,
 } from "../internal"
 import { rectRectIntersection } from "../utils/selectionHelper"
+import { ComponentLibrary } from "../utils/componentLibrary"
 
 export type GroupSaveObject = ComponentSaveObject & {
 	components: ComponentSaveObject[]
@@ -24,6 +25,12 @@ export class GroupComponent extends CircuitComponent {
 	}
 
 	public groupedComponents: CircuitComponent[] = []
+
+	/**
+	 * set while a reusable component is placed (see {@link forPlacement}): the save object of the group, to place more copies,
+	 * and if the group only wraps a single component for the placement and has to be dissolved afterwards
+	 */
+	private placement: { template: GroupSaveObject; dissolve: boolean } | null = null
 
 	constructor(components: CircuitComponent[]) {
 		super()
@@ -47,9 +54,12 @@ export class GroupComponent extends CircuitComponent {
 
 		this.properties.add(PropertyCategories.ordering, new SectionHeaderProperty("Grouping"))
 		let grouping = new ButtonGridProperty(
-			1,
-			[["Ungroup", ""]],
-			[(ev) => this.ungroup()],
+			2,
+			[
+				["Ungroup", ""],
+				["Save as component", ""],
+			],
+			[(ev) => this.ungroup(), (ev) => ComponentLibrary.instance.save([this])],
 			undefined,
 			undefined,
 			"ordering:ungroup"
@@ -66,7 +76,30 @@ export class GroupComponent extends CircuitComponent {
 		Undo.addState()
 	}
 
+	/**
+	 * a group of the (just created) components which can be placed with the ComponentPlacer like a symbol.
+	 * A single component is only wrapped for the placement.
+	 */
+	public static forPlacement(components: CircuitComponent[]): GroupComponent {
+		const group = new GroupComponent(components)
+		group.placement = { template: group.toJson(), dissolve: components.length == 1 }
+		// the constructor selects the group, but components are not selected while they are placed
+		SelectionController.instance.selectComponents([], SelectionMode.RESET)
+		group.draggable(false)
+		return group
+	}
+
 	public ungroup() {
+		const components = this.groupedComponents
+		this.dissolve()
+		SelectionController.instance.selectComponents(components, SelectionMode.RESET)
+		Undo.addState()
+	}
+
+	/**
+	 * replaces the group by its components (without selecting them or adding an undo state)
+	 */
+	private dissolve() {
 		const idx = MainController.instance.circuitComponents.indexOf(this)
 		MainController.instance.circuitComponents.splice(idx, 1, ...this.groupedComponents)
 		const parent = this.visualization.parent()
@@ -76,10 +109,8 @@ export class GroupComponent extends CircuitComponent {
 			component.parentGroup = null
 			parent.add(component.visualization, currentIdx + index)
 		}
-		SelectionController.instance.selectComponents(this.groupedComponents, SelectionMode.RESET)
 		this.groupedComponents = []
 		this.remove()
-		Undo.addState()
 	}
 
 	public isInsideSelectionRectangle(selectionRectangle: SVG.Box): boolean {
@@ -180,8 +211,13 @@ export class GroupComponent extends CircuitComponent {
 		return group
 	}
 	public copyForPlacement(): CircuitComponent {
-		//not needed
-		return
+		if (!this.placement) {
+			// groups are only placed as reusable components
+			return
+		}
+		return GroupComponent.forPlacement(
+			this.placement.template.components.map((saveObject) => CircuitComponent.fromJson(saveObject))
+		)
 	}
 	public remove(): void {
 		this.viewSelected(false)
@@ -192,16 +228,26 @@ export class GroupComponent extends CircuitComponent {
 		this.visualization.remove()
 	}
 	public placeMove(pos: SVG.Point, ev?: Event): void {
-		//not needed
-		return
+		this.moveTo(pos)
 	}
 	public placeStep(pos: SVG.Point, ev?: Event): boolean {
-		//not needed
-		return
+		this.moveTo(pos)
+		return true
+	}
+	public placeRotate(angleDeg: number): void {
+		this.rotate(angleDeg)
+	}
+	public placeFlip(horizontal: boolean): void {
+		this.flip(horizontal)
 	}
 	public placeFinish(): void {
-		//not needed
-		return
+		if (!this.placement) {
+			return
+		}
+		this.draggable(true)
+		if (this.placement.dissolve) {
+			this.dissolve()
+		}
 	}
 
 	public moveRel(delta: SVG.Point): void {

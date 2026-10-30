@@ -27,6 +27,8 @@ The extension opens `*.drawtikz.json` files in the draw.tikz editor inside VS Co
 
 Saving and undo/redo go through VS Code like for any other file. Exporting to Ti*k*Z or SVG writes the file into the workspace: the first export of a drawing suggests the folder from the setting `drawtikz.defaultExportFolder` (default `fig`), later exports overwrite the same file.
 
+Reusable components ("Save as component", see below) are saved into the folder from the setting `drawtikz.componentFolder` (default `components`). All drawings in that folder are listed under "My components" in the symbol picker and update when the files change.
+
 All controls of the editor are explained in the help menu (circled question mark in the top right corner).
 
 ## Changes compared to CircuiTi*k*Z-Designer
@@ -46,6 +48,7 @@ All controls of the editor are explained in the help menu (circled question mark
 - **Symbol picker:** the symbol panel pops up in the middle of the screen (Q or I) and can be used with the keyboard like a picker in vim: type to search (fuzzy or regex), Enter places the highlighted symbol, Ctrl+J/K moves while typing, Tab switches to normal mode with h/j/k/l, gg/G and / (Tab goes back), Esc closes
 - **SVG export for Office:** text inside symbols (e.g. T, Q and Q̄ on flip-flops) and labels no longer disappear when the exported SVG is used in PowerPoint or Word
 - **Grid switch** at startup now matches whether the grid is visible
+- **Reusable components:** select a part of a drawing and click "Save as component" (properties panel, also on a group) to save it as its own `.drawtikz.json` file. It shows up under "My components" in the symbol picker and is placed like a symbol: it follows the cursor, snaps to the grid, can be rotated and flipped, and a click places it as a group. "Import file..." in the same group places any drawing. In the browser the components are kept in the browser storage; in VS Code they are the files in the component folder of the workspace
 - No Google Analytics, no Electron desktop app
 
 ## Features

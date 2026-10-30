@@ -95,11 +95,21 @@ export class ExportController {
 		this.usedIDs = new Map<string, number>()
 	}
 
-	exportJSON(text: string) {
+	/**
+	 * Shows the exportModal with a JSON file
+	 * @param basename suggested file name, default the name of the design
+	 * @param extensions the file extensions to choose from
+	 */
+	exportJSON(text: string, basename?: string, extensions = [".json", ".txt"]) {
 		this.heading.textContent = "Save JSON"
-
-		// create extension select list
-		const extensions = [".json", ".txt"]
+		if (basename !== undefined) {
+			// only for this file, afterwards the name the user typed before is suggested again
+			const previousBasename = this.fileBasename.value
+			this.fileBasename.value = basename
+			this.modalElement.addEventListener("hidden.bs.modal", () => (this.fileBasename.value = previousBasename), {
+				once: true,
+			})
+		}
 
 		this.exportedContent.rows = Math.max(text.split("\n").length, 2)
 		this.exportedContent.value = text

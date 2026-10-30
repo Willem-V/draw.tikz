@@ -21,6 +21,8 @@ export type SaveFileFormat = {
 	components: ComponentSaveObject[]
 	/** where the drawing was last exported to, relative to the save file (only used by the VS Code extension) */
 	exports?: { tikz?: string; svg?: string }
+	/** svg of the components for the symbol picker, only in reusable component files (see utils/componentLibrary.ts) */
+	preview?: string
 }
 
 export let emtpySaveState: SaveFileFormat = {
