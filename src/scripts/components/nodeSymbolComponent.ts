@@ -1,5 +1,6 @@
 import * as SVG from "@svgdotjs/svg.js"
 import {
+	EnvironmentVariableController,
 	AdjustDragHandler,
 	BooleanProperty,
 	buildTikzStringFromNodeCommand,
@@ -11,6 +12,7 @@ import {
 	defaultFill,
 	defaultStroke,
 	EnumOption,
+	GridSizeProperty,
 	InfoProperty,
 	MainController,
 	NodeComponent,
@@ -30,6 +32,7 @@ import {
 } from "../internal"
 import { resizeSVG, roundTikz, selectedBoxWidth } from "../utils/selectionHelper"
 import { createSizeProperties, SizeProperties } from "../utils/sizeProperties"
+import { gridScales, gridSpacingPx, mainPins, maxDefaultSizeChange, roundScale } from "../utils/gridFit"
 
 // TODO don't use <use> element as the component visualisation, but directly the symbol's children
 
@@ -38,6 +41,8 @@ type ShapeSizeSaveObject = { width?: number; height?: number; rightHeight?: numb
 export type NodeSymbolSaveObject = NodeSaveObject & {
 	id: string
 	options?: string[]
+	/** MOS transistors: how it is drawn, drawings of older versions only have the options arrowmos and emptycircle */
+	transistorStyle?: TransistorStyle
 	portSize?: ShapeSizeSaveObject
 	blockSize?: ShapeSizeSaveObject
 	pins?: Partial<Record<PinSide, number>>
@@ -47,6 +52,23 @@ export type NodeSymbolSaveObject = NodeSaveObject & {
 /**
  * the logic ports which can be resized via the circuitikz keys tripoles/<name>/width and tripoles/<name>/height
  */
+/** the CircuiTikZ option which draws the arrow of a MOS transistor (instead of the circle at the gate of a PMOS) */
+const arrowmosOption = "arrowmos"
+const emptyCircleOption = "emptycircle"
+const noCircleOption = "nocircle"
+
+/**
+ * how a MOS transistor is drawn: with an arrow or, for a PMOS, with a circle at the gate. "default" follows the transistor
+ * setting of the drawing, the others overwrite it for a single transistor.
+ */
+type TransistorStyle = "default" | "arrow" | "emptyCircle" | "filledCircle" | "none"
+const transistorStyleNames: Record<TransistorStyle, string> = {
+	default: "Drawing default",
+	arrow: "Arrow",
+	emptyCircle: "Empty circle",
+	filledCircle: "Filled circle",
+	none: "No arrow",
+}
 const resizablePorts = ["european blank port", "european blank not port"]
 const defaultPortWidth = 1.4
 const defaultPortHeight = 0.65
@@ -135,6 +157,8 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 	protected componentVariant: Variant
 
 	protected scaleProperty: SliderProperty
+	/** sizes at which all pins are on the grid (the free scale is the off-grid alternative) */
+	protected gridSizeProperty: GridSizeProperty
 
 	/**
 	 * resizable ports (see resizablePorts), the block with pins and the mux are drawn here instead of taken from the symbol database
@@ -232,6 +256,10 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 			}
 			this.properties.add(PropertyCategories.manipulation, this.shapeSize.lockAspectRatio)
 		} else {
+			this.gridSizeProperty = new GridSizeProperty(() => this.gridScales(), new SVG.Point(1, 1))
+			this.gridSizeProperty.addChangeListener((ev) => this.applyGridSize(ev.value))
+			this.properties.add(PropertyCategories.manipulation, this.gridSizeProperty)
+			this.scaleProperty.label = "Free scale"
 			this.properties.add(PropertyCategories.manipulation, this.scaleProperty)
 		}
 
@@ -241,7 +269,26 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 				PropertyCategories.options,
 				new SectionHeaderProperty("Options", undefined, "options:header")
 			)
+			// the gate circle of a PMOS is one of the options "nocircle" and "emptycircle"
+			const gateCircleOptions = symbol.possibleEnumOptions.find((enumOption) =>
+				enumOption.options.some((option) => option.name == emptyCircleOption)
+			)
+			this.hasGateCircle = gateCircleOptions !== undefined
+			if (symbol.possibleOptions.some((option) => option.name == arrowmosOption)) {
+				// replaces the options arrowmos and emptycircle
+				const styles: TransistorStyle[] =
+					this.hasGateCircle ?
+						["default", "arrow", "emptyCircle", "filledCircle"]
+					:	["default", "arrow", "none"]
+				const entries = styles.map((style) => ({ key: style, name: transistorStyleNames[style] }))
+				this.transistorStyle = new ChoiceProperty("Style", entries, entries[0], undefined, "options:transistorStyle")
+				this.transistorStyle.addChangeListener(() => this.updateOptions())
+				this.properties.add(PropertyCategories.options, this.transistorStyle)
+			}
 			for (const option of symbol.possibleOptions) {
+				if (this.transistorStyle && option.name == arrowmosOption) {
+					continue
+				}
 				const property = new BooleanProperty(
 					option.displayName ?? option.name,
 					false,
@@ -256,6 +303,9 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 				this.properties.add(PropertyCategories.options, property)
 			}
 			for (const enumOption of symbol.possibleEnumOptions) {
+				if (this.transistorStyle && enumOption === gateCircleOptions) {
+					continue
+				}
 				let choices: ChoiceEntry[] = enumOption.selectNone ? [{ key: "-", name: "--default--" }] : []
 				enumOption.options.forEach((option) => {
 					choices.push({ key: option.name, name: option.displayName ?? option.name })
@@ -329,9 +379,38 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 
 		this.addInfo()
 
-		this.snappingPoints = this.componentVariant.pins.map(
-			(pin) => new SnapPoint(this, pin.name, pin.point.add(this.componentVariant.mid))
-		)
+		this.createSnappingPoints()
+		this.useDefaultGridSize()
+	}
+
+	/**
+	 * only the main terminals align the symbol to the grid, the other pins still connect to other components
+	 */
+	private createSnappingPoints() {
+		const main = mainPins(this.componentVariant.pins)
+		this.snappingPoints = this.componentVariant.pins.map((pin) => {
+			const snapPoint = new SnapPoint(this, pin.name, pin.point.add(this.componentVariant.mid))
+			snapPoint.snapsToGrid = main.includes(pin)
+			return snapPoint
+		})
+	}
+
+	/**
+	 * grid first: a new symbol gets the grid size closest to its normal size, so its pins are on the grid.
+	 * Loading a drawing sets the saved scale afterwards.
+	 */
+	private useDefaultGridSize() {
+		const scales = this.gridSizeProperty ? this.gridScales() : []
+		if (scales.length == 0) {
+			return
+		}
+		const deviation = (scale: SVG.Point) => Math.abs(Math.log(scale.x)) + Math.abs(Math.log(scale.y))
+		const closest = scales.reduce((best, scale) => (deviation(scale) < deviation(best) ? scale : best))
+		if (Math.max(Math.abs(Math.log(closest.x)), Math.abs(Math.log(closest.y))) > maxDefaultSizeChange) {
+			return
+		}
+		this.scaleState = new SVG.Point(roundScale(closest.x), roundScale(closest.y))
+		this.scaleProperty.updateValue(new SVG.Number(roundScale(closest.x)), true, false)
 	}
 
 	private isMuxdemux(): boolean {
@@ -667,10 +746,47 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 		this.shapeSymbol?.remove()
 	}
 
+	/** MOS transistors: the style which overwrites the drawing default */
+	private transistorStyle: ChoiceProperty<ChoiceEntry> | undefined
+	/** the symbol has a circle at the gate (PMOS) */
+	private hasGateCircle = false
+	/** the style the current variant was chosen with, to notice when the setting of the drawing changes it */
+	private appliedStyle: TransistorStyle | undefined
+
+	/**
+	 * how a MOS transistor is drawn, with the transistor setting of the drawing for the default style
+	 */
+	private resolvedStyle(): TransistorStyle | undefined {
+		if (!this.transistorStyle) {
+			return undefined
+		}
+		const style = this.transistorStyle.value.key as TransistorStyle
+		if (style != "default") {
+			return style
+		}
+		if (EnvironmentVariableController.instance.getGlobalSettings().transistorArrows == "end") {
+			return "arrow"
+		}
+		return this.hasGateCircle ? "emptyCircle" : "none"
+	}
+
 	protected optionsFromProperties(): SymbolOption[] {
 		const selectedOptions: SymbolOption[] = []
+		this.appliedStyle = this.resolvedStyle()
+		// an arrow replaces the circle at the gate of a PMOS
+		const styleOptions = {
+			arrow: this.hasGateCircle ? [arrowmosOption, noCircleOption] : [arrowmosOption],
+			emptyCircle: [emptyCircleOption],
+		}[this.appliedStyle as string]
+		const allOptions = [
+			...this.referenceSymbol.possibleOptions,
+			...this.referenceSymbol.possibleEnumOptions.flatMap((enumOption) => enumOption.options),
+		]
+		for (const name of styleOptions ?? []) {
+			selectedOptions.push(allOptions.find((option) => option.name == name))
+		}
 		this.optionProperties.forEach((option, property) => {
-			if (property.value) {
+			if (property.value && !selectedOptions.includes(option)) {
 				selectedOptions.push(option)
 			}
 		})
@@ -684,6 +800,20 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 			}
 		})
 		return selectedOptions
+	}
+
+	/**
+	 * the style for a transistor of a drawing without styles (older versions), which keeps its look
+	 */
+	private styleFromOptions(options: string[]): TransistorStyle {
+		const names = options.map((option) => option.toLowerCase().replaceAll(" ", ""))
+		if (names.includes(arrowmosOption)) {
+			return "arrow"
+		}
+		if (names.includes(emptyCircleOption)) {
+			return "emptyCircle"
+		}
+		return this.hasGateCircle ? "filledCircle" : "none"
 	}
 
 	protected addInfo() {
@@ -726,20 +856,62 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 		this.size = new SVG.Point(this.componentVariant.viewBox.w, this.componentVariant.viewBox.h)
 		this.defaultTextPosition = this.componentVariant.textPosition.point.add(this.componentVariant.mid)
 
-		this.snappingPoints = this.componentVariant.pins.map(
-			(pin) => new SnapPoint(this, pin.name, pin.point.add(this.componentVariant.mid))
-		)
+		this.createSnappingPoints()
 		this.update()
 	}
 
 	public getSnappingInfo(): SnappingInfo {
+		const center = new SnapPoint(this, "center", this.componentVariant.mid)
+		// the center of a symbol with terminals is often between two grid points
+		center.snapsToGrid = this.snappingPoints.length < 2
 		return {
 			trackedSnappingPoints: this.snappingPoints,
-			additionalSnappingPoints: [new SnapPoint(this, "center", this.componentVariant.mid)],
+			additionalSnappingPoints: [center],
+		}
+	}
+
+	/** the grid sizes per variant of the symbol (and grid spacing), they are needed after every change */
+	private static gridScalesCache = new WeakMap<Variant, { grid: number; scales: SVG.Point[] }>()
+
+	private gridScales(): SVG.Point[] {
+		const grid = gridSpacingPx()
+		let cached = NodeSymbolComponent.gridScalesCache.get(this.componentVariant)
+		if (cached?.grid !== grid) {
+			cached = { grid, scales: gridScales(mainPins(this.componentVariant.pins).map((pin) => pin.point), grid) }
+			NodeSymbolComponent.gridScalesCache.set(this.componentVariant, cached)
+		}
+		return cached.scales
+	}
+
+	/**
+	 * scales the symbol to a grid size and moves it so its pins are on the grid
+	 */
+	private applyGridSize(scale: SVG.Point) {
+		this.scaleState = new SVG.Point(
+			Math.sign(this.scaleState.x) * roundScale(scale.x),
+			Math.sign(this.scaleState.y) * roundScale(scale.y)
+		)
+		this.scaleProperty.updateValue(new SVG.Number(roundScale(scale.x)), true, false)
+		this.update()
+		const pins = this.componentVariant.pins
+		const pin = this.snappingPoints[pins.indexOf(mainPins(pins)[0])]
+		if (pin) {
+			const grid = gridSpacingPx()
+			const onGrid = new SVG.Point(Math.round(pin.x / grid) * grid, Math.round(pin.y / grid) * grid)
+			this.moveRel(onGrid.sub(pin))
 		}
 	}
 
 	public update() {
+		// changing the transistor setting of the drawing also changes the transistors which are already placed
+		if (this.componentVariant && this.resolvedStyle() != this.appliedStyle) {
+			this.updateOptions()
+			return
+		}
+		// the size shown in the properties window follows every change of the scale and options (free scale, flipping, loading)
+		if (this.gridSizeProperty) {
+			this.gridSizeProperty.value = new SVG.Point(Math.abs(this.scaleState.x), Math.abs(this.scaleState.y))
+		}
 		// the symbol can change with the global transistor arrow position
 		const symbolHref = "#" + variantSymbol(this.componentVariant).id()
 		if (this.componentVisualization.node.getAttribute("href") != symbolHref) {
@@ -785,6 +957,9 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 
 		if (this.componentVariant.options.length > 0) {
 			data.options = this.componentVariant.options.map((option) => option.displayName ?? option.name)
+		}
+		if (this.transistorStyle) {
+			data.transistorStyle = this.transistorStyle.value.key as TransistorStyle
 		}
 		if (this.name.value) {
 			data.name = this.name.value
@@ -887,6 +1062,11 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 			this.muxSquarePins.value = saveObject.squarePins ?? false
 		}
 		let options = saveObject.options ?? []
+		if (this.transistorStyle) {
+			this.transistorStyle.value = this.transistorStyle.entries.find(
+				(entry) => entry.key == (saveObject.transistorStyle ?? this.styleFromOptions(options))
+			)
+		}
 		this.setPropertiesFromOptions(this.referenceSymbol.getOptionsFromOptionNames(options))
 		this.scaleProperty.value = new SVG.Number(Math.abs(this.scaleState.x))
 		if (this.shapeKind && (Math.abs(this.scaleState.x) != 1 || Math.abs(this.scaleState.y) != 1)) {

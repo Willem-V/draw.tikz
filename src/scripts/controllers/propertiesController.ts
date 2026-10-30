@@ -1,15 +1,17 @@
 import {
 	AlignmentMode,
-	ButtonGridProperty,
 	CanvasController,
 	CircuitComponent,
 	DistributionMode,
 	EditableProperty,
 	EnvironmentVariableController,
 	GroupComponent,
+	IconToolbarProperty,
 	MainController,
+	orderButtons,
 	SectionHeaderProperty,
 	SelectionController,
+	transformButtons,
 	Undo,
 } from "../internal"
 
@@ -107,140 +109,78 @@ export class PropertyController {
 		this.propertiesEntries.classList.remove("d-none")
 		this.propertiesTitle.innerText = "Selection"
 
-		let rows: HTMLElement[] = []
-		let positioning = new ButtonGridProperty(
-			2,
-			[
-				["Rotate 90° CW", "rotate_right"],
-				["Rotate 90° CCW", "rotate_left"],
-				["Rotate 45° CW", "rotate_right"],
-				["Rotate 45° CCW", "rotate_left"],
-				["Flip vertically", ["flip", "rotateText"]],
-				["Flip horizontally", "flip"],
-			],
-			[
-				(ev) => {
-					SelectionController.instance.rotateSelection(-90)
-					Undo.addState()
-				},
-				(ev) => {
-					SelectionController.instance.rotateSelection(90)
-					Undo.addState()
-				},
-				(ev) => {
-					SelectionController.instance.rotateSelection(-45)
-					Undo.addState()
-				},
-				(ev) => {
-					SelectionController.instance.rotateSelection(45)
-					Undo.addState()
-				},
-				(ev) => {
-					SelectionController.instance.flipSelection(true)
-					Undo.addState()
-				},
-				(ev) => {
-					SelectionController.instance.flipSelection(false)
-					Undo.addState()
-				},
-			],
-			false,
-			[
-				"Rotate the components 90 degrees clockwise",
-				"Rotate the components 90 degrees counter clockwise",
-				"Rotate the components 45 degrees clockwise",
-				"Rotate the components 45 degrees counter clockwise",
-				"Flip the components around its x-axis",
-				"Flip the components around its y-axis",
-			]
+		const selection = SelectionController.instance
+		const transform = transformButtons(
+			(angleDeg) => {
+				selection.rotateSelection(angleDeg)
+				Undo.addState()
+			},
+			(horizontalAxis) => {
+				selection.flipSelection(horizontalAxis)
+				Undo.addState()
+			},
+			"the selection"
 		)
-		rows.push(positioning.buildHTML())
-
-		rows.push(new SectionHeaderProperty("Ordering").buildHTML())
-		let ordering = new ButtonGridProperty(
-			2,
+		const order = orderButtons(
+			() => CanvasController.instance.componentsToForeground(selection.currentlySelectedComponents),
+			() => CanvasController.instance.moveComponentsForward(selection.currentlySelectedComponents),
+			() => CanvasController.instance.moveComponentsBackward(selection.currentlySelectedComponents),
+			() => CanvasController.instance.componentsToBackground(selection.currentlySelectedComponents)
+		)
+		const align = (mode: AlignmentMode, horizontal: boolean) => () => selection.alignSelection(mode, horizontal)
+		const distribute = (mode: DistributionMode, horizontal: boolean) => () =>
+			selection.distributeSelection(mode, horizontal)
+		const toolbar = new IconToolbarProperty([
+			...transform,
+			order,
 			[
-				["Foreground", ""],
-				["Background", ""],
-				["Forward", ""],
-				["Backward", ""],
+				{
+					icon: "group_work",
+					text: "Group",
+					tooltip: "Group the components, so they are moved and selected together",
+					onClick: () => GroupComponent.group(selection.currentlySelectedComponents),
+				},
 			],
 			[
-				(ev) =>
-					CanvasController.instance.componentsToForeground(
-						SelectionController.instance.currentlySelectedComponents
-					),
-				(ev) =>
-					CanvasController.instance.componentsToBackground(
-						SelectionController.instance.currentlySelectedComponents
-					),
-				(ev) =>
-					CanvasController.instance.moveComponentsForward(
-						SelectionController.instance.currentlySelectedComponents
-					),
-				(ev) =>
-					CanvasController.instance.moveComponentsBackward(
-						SelectionController.instance.currentlySelectedComponents
-					),
-			],
-			false,
-			[
-				"Bring the components to the foreground",
-				"Move the components to the background",
-				"Move the components one step towards the foreground",
-				"Move the components one step towards the background",
-			]
-		)
-		rows.push(ordering.buildHTML())
-
-		rows.push(new SectionHeaderProperty("Grouping").buildHTML())
-		let grouping = new ButtonGridProperty(
-			1,
-			[["Group", ""]],
-			[(ev) => GroupComponent.group(SelectionController.instance.currentlySelectedComponents)]
-		)
-		rows.push(grouping.buildHTML())
-
-		rows.push(new SectionHeaderProperty("Align").buildHTML())
-		let alignment = new ButtonGridProperty(
-			3,
-			[
-				["", "align_horizontal_left"],
-				["", "align_horizontal_center"],
-				["", "align_horizontal_right"],
-				["", "align_vertical_top"],
-				["", "align_vertical_center"],
-				["", "align_vertical_bottom"],
+				{ icon: "align_horizontal_left", tooltip: "Align left", onClick: align(AlignmentMode.START, true) },
+				{
+					icon: "align_horizontal_center",
+					tooltip: "Align centers horizontally",
+					onClick: align(AlignmentMode.CENTER, true),
+				},
+				{ icon: "align_horizontal_right", tooltip: "Align right", onClick: align(AlignmentMode.END, true) },
+				{ icon: "align_vertical_top", tooltip: "Align top", onClick: align(AlignmentMode.START, false) },
+				{
+					icon: "align_vertical_center",
+					tooltip: "Align centers vertically",
+					onClick: align(AlignmentMode.CENTER, false),
+				},
+				{ icon: "align_vertical_bottom", tooltip: "Align bottom", onClick: align(AlignmentMode.END, false) },
 			],
 			[
-				(ev) => SelectionController.instance.alignSelection(AlignmentMode.START, true),
-				(ev) => SelectionController.instance.alignSelection(AlignmentMode.CENTER, true),
-				(ev) => SelectionController.instance.alignSelection(AlignmentMode.END, true),
-				(ev) => SelectionController.instance.alignSelection(AlignmentMode.START, false),
-				(ev) => SelectionController.instance.alignSelection(AlignmentMode.CENTER, false),
-				(ev) => SelectionController.instance.alignSelection(AlignmentMode.END, false),
-			]
-		)
-		rows.push(alignment.buildHTML())
-
-		rows.push(new SectionHeaderProperty("Distribute").buildHTML())
-		let distribute = new ButtonGridProperty(
-			2,
-			[
-				["Center", "horizontal_distribute"],
-				["Spacing", "align_justify_space_even"],
-				["Center", "vertical_distribute"],
-				["Spacing", "align_space_even"],
+				{
+					icon: "horizontal_distribute",
+					tooltip: "Distribute the centers horizontally",
+					onClick: distribute(DistributionMode.CENTER, true),
+				},
+				{
+					icon: "align_justify_space_even",
+					tooltip: "Equal horizontal spacing",
+					onClick: distribute(DistributionMode.SPACE, true),
+				},
+				{
+					icon: "vertical_distribute",
+					tooltip: "Distribute the centers vertically",
+					onClick: distribute(DistributionMode.CENTER, false),
+				},
+				{
+					icon: "align_space_even",
+					tooltip: "Equal vertical spacing",
+					onClick: distribute(DistributionMode.SPACE, false),
+				},
 			],
-			[
-				(ev) => SelectionController.instance.distributeSelection(DistributionMode.CENTER, true),
-				(ev) => SelectionController.instance.distributeSelection(DistributionMode.SPACE, true),
-				(ev) => SelectionController.instance.distributeSelection(DistributionMode.CENTER, false),
-				(ev) => SelectionController.instance.distributeSelection(DistributionMode.SPACE, false),
-			]
-		)
-		rows.push(distribute.buildHTML())
-
+		])
+		const rows: HTMLElement[] = [toolbar.getHTMLElement()]
 		this.propertiesEntries.append(...rows)
 
 		const overlappingProperties: PropertiesCollection = new PropertiesCollection()
@@ -294,12 +234,14 @@ export class PropertyController {
 			overlappingProperties.set(category, relevantProperties)
 		}
 		this.propertiesEntries.append(...overlappingProperties.sorted().map((property) => property.getHTMLElement()))
+		SectionHeaderProperty.applyCollapsed(this.propertiesEntries)
 	}
 
 	private setForm(component: CircuitComponent) {
 		this.propertiesEntries.classList.remove("d-none")
 		this.propertiesTitle.innerText = component.displayName
 		this.propertiesEntries.append(...component.properties.sorted().map((property) => property.getHTMLElement()))
+		SectionHeaderProperty.applyCollapsed(this.propertiesEntries)
 	}
 
 	private setFormView() {
@@ -324,6 +266,7 @@ export class PropertyController {
 
 		if (!document.getElementById("envVarView")) {
 			document.getElementById("view-properties").appendChild(EnvironmentVariableController.instance.getHTML())
+			SectionHeaderProperty.applyCollapsed(EnvironmentVariableController.instance.getHTML())
 		}
 	}
 

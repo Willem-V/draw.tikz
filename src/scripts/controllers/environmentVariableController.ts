@@ -1,4 +1,12 @@
-import { ButtonGridProperty, ChoiceEntry, ChoiceProperty, MainController, SectionHeaderProperty } from "../internal"
+import {
+	ButtonGridProperty,
+	ChoiceEntry,
+	ChoiceProperty,
+	MainController,
+	PreviewChoiceEntry,
+	PreviewChoiceProperty,
+	SectionHeaderProperty,
+} from "../internal"
 
 export type StylePreset = "default" | "american" | "european"
 
@@ -29,7 +37,8 @@ type GlobalOption = {
 	key: OptionsChoice
 	name: string
 	tikz: "environment" | "ctikzset"
-	choices: { key: string; name: string; tikz: string }[]
+	/** with a preview, the choice is shown as pictures instead of a dropdown */
+	choices: { key: string; name: string; tikz: string; preview?: string }[]
 	/**
 	 * the key of the choice circuitikz uses if nothing is set. Only needed if it differs from the designer default, since the setting has to be exported whenever it differs from the circuitikz default
 	 */
@@ -40,13 +49,13 @@ type GlobalOption = {
 
 const voltageOption: GlobalOption = {
 	key: "voltages",
-	name: "Voltage Style",
+	name: "Voltages",
 	tikz: "environment",
 	choices: [
-		{ key: "american", name: "American Voltages", tikz: "american voltages" },
-		{ key: "european", name: "European Voltages", tikz: "european voltages" },
-		{ key: "straight", name: "Straight Voltages", tikz: "straight voltages" },
-		{ key: "raised", name: "Raised Voltages", tikz: "raised voltages" },
+		{ key: "american", name: "+ and − signs (American)", tikz: "american voltages" },
+		{ key: "european", name: "Curved arrow (European)", tikz: "european voltages" },
+		{ key: "straight", name: "Straight arrow", tikz: "straight voltages" },
+		{ key: "raised", name: "Raised arrow", tikz: "raised voltages" },
 	],
 }
 
@@ -94,13 +103,13 @@ const voltageOption: GlobalOption = {
 
 const voltageConventionOption: GlobalOption = {
 	key: "voltageConvention",
-	name: "Voltage Convention",
+	name: "Voltage direction",
 	tikz: "environment",
 	choices: [
-		{ key: "old", name: "Old Voltage Direction Convention", tikz: "voltage dir=old" },
-		{ key: "RP", name: "RP Voltage Direction Convention", tikz: "voltage dir=RP" },
-		{ key: "EF", name: "EF Voltage Direction Convention", tikz: "voltage dir=EF" },
-		{ key: "noold", name: "No Old Voltage Direction Convention", tikz: "voltage dir=nold" },
+		{ key: "old", name: "Legacy (old)", tikz: "voltage dir=old" },
+		{ key: "RP", name: "Towards the higher potential (RP)", tikz: "voltage dir=RP" },
+		{ key: "EF", name: "Along the electric field (EF)", tikz: "voltage dir=EF" },
+		{ key: "noold", name: "Standard (noold)", tikz: "voltage dir=nold" },
 	],
 }
 
@@ -109,21 +118,50 @@ const labelOrientationOption: GlobalOption = {
 	name: "Label Orientation",
 	tikz: "ctikzset",
 	choices: [
-		{ key: "smart", name: "Smart Label Orientation", tikz: "label/align=smart" },
-		{ key: "rotate", name: "Rotated Label Orientation", tikz: "label/align=rotate" },
-		{ key: "straight", name: "Straight Label Orientation", tikz: "label/align=straight" },
+		{ key: "smart", name: "Readable (smart)", tikz: "label/align=smart" },
+		{ key: "rotate", name: "Rotated with the component", tikz: "label/align=rotate" },
+		{ key: "straight", name: "Always horizontal", tikz: "label/align=straight" },
 	],
+}
+
+/**
+ * the PMOS symbol of CircuiTikZ: with an empty circle at the gate, or with the arrow at the end of the source lead
+ */
+function transistorPreview(withArrow: boolean): string {
+	const arrow = "M25.86325 19.4474V22.49428L19.05075 19.4474L25.86325 16.40054Z"
+	const circle =
+		"M14.60638 29.63372c0-1.16872-.94744-2.11617-2.11618-2.11617-1.16872 0-2.11615.94745-2.11615 2.11617s.94743 2.11618 2.11615 2.11618c1.16874 0 2.11618-.94744 2.11618-2.11618Z"
+	return `<svg viewBox="-1 -1 40 61" width="34" height="52" fill="none" stroke="currentColor" stroke-width=".8" stroke-linejoin="round">
+		<path d="M37.57.26569v19.18203h-18.51952M19.05087 39.81972h18.51952v19.18204"/>
+		<path stroke-width="1.6" d="M19.05087 15.08254v29.10236m-4.4445-24.73718v20.372"/>
+		${
+			withArrow ?
+				`<path d="M14.60638 29.63372h-14.34069"/><path d="${arrow}" fill="currentColor" stroke="none"/>`
+			:	`<path d="M10.37 29.63372H.26569"/><path d="${circle}"/>`
+		}
+	</svg>`
 }
 
 const transistorArrowOption: GlobalOption = {
 	key: "transistorArrows",
-	name: "Transistor Arrow Position",
+	name: "Transistors",
 	tikz: "ctikzset",
 	choices: [
-		{ key: "legacy", name: "Arrows in the Middle of the Terminal", tikz: "transistors/arrow pos=legacy" },
-		{ key: "end", name: "Arrows at the End of the Terminal", tikz: "transistors/arrow pos=end" },
+		{
+			key: "legacy",
+			name: "Without arrow (a PMOS has an empty circle at the gate)",
+			tikz: "transistors/arrow pos=end",
+			preview: transistorPreview(false),
+		},
+		{
+			key: "end",
+			name: "With arrow (at the end of the terminal)",
+			tikz: "transistors/arrow pos=end",
+			preview: transistorPreview(true),
+		},
 	],
-	tikzDefault: "legacy",
+	// the symbols always draw the arrows at the end of the terminal, so this is always set (never equal to a choice)
+	tikzDefault: "always",
 }
 
 const STYLE_PRESETS: Record<StylePreset, Partial<Record<OptionsChoice, string>>> = {
@@ -189,11 +227,15 @@ export class EnvironmentVariableController {
 		this.globalSettings = {} as GlobalTikzSettings
 
 		for (const option of allOptions) {
-			let choiceProperty = new ChoiceProperty(
-				option.name,
-				option.choices,
-				option.choices.find((choice) => choice.key === defaults[option.key])
-			)
+			const initial = option.choices.find((choice) => choice.key === defaults[option.key])
+			const choiceProperty =
+				option.choices.every((choice) => choice.preview) ?
+					new PreviewChoiceProperty(
+						option.name,
+						option.choices as PreviewChoiceEntry[],
+						initial as PreviewChoiceEntry
+					)
+				:	new ChoiceProperty(option.name, option.choices, initial)
 			this.propertyMap.set(option.key, choiceProperty)
 
 			this.globalSettings[option.key] = defaults[option.key]
@@ -240,7 +282,7 @@ export class EnvironmentVariableController {
 		this.htmlElement.id = "envVarView"
 		this.htmlElement.classList.add("container-fluid", "w-100", "m-0", "gap-3", "px-0")
 
-		this.htmlElement.appendChild(new SectionHeaderProperty("Environment Variable Presets").getHTMLElement())
+		this.htmlElement.appendChild(new SectionHeaderProperty("Drawing style").getHTMLElement())
 		let presetButtons = new ButtonGridProperty(
 			3,
 			[
@@ -263,7 +305,7 @@ export class EnvironmentVariableController {
 
 		this.htmlElement.appendChild(presetButtons.getHTMLElement())
 
-		this.htmlElement.appendChild(new SectionHeaderProperty("Change environment variables").getHTMLElement())
+		this.htmlElement.appendChild(new SectionHeaderProperty("Style details").getHTMLElement())
 		for (const property of this.propertyMap.values()) {
 			this.htmlElement.appendChild(property.getHTMLElement())
 		}

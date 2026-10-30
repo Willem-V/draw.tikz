@@ -137,3 +137,17 @@ body {
 	font-weight: 500;
 	vertical-align: middle;
 }
+
+// properties window: collapsible sections (SectionHeaderProperty)
+.sectionCollapsed {
+	display: none !important;
+}
+.propertySectionHeader .sectionChevron {
+	transition: transform 0.15s;
+}
+.propertySectionHeader.collapsed .sectionChevron {
+	transform: rotate(-90deg);
+}
+.choicePreview svg {
+	display: block;
+}

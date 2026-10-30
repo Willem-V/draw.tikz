@@ -189,9 +189,8 @@ export abstract class NodeComponent extends PositionLabelable(Nameable(CircuitCo
 			this.rotationDeg = saveObject.rotation ?? saveObject.rotationDeg
 		}
 
-		if (saveObject.scale) {
-			this.scaleState = new SVG.Point(saveObject.scale)
-		}
+		// no scale saved means the normal size (new symbols can start with a different size, see NodeSymbolComponent)
+		this.scaleState = saveObject.scale ? new SVG.Point(saveObject.scale) : new SVG.Point(1, 1)
 	}
 
 	public toTikzString(): string {
