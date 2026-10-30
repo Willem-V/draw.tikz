@@ -20,6 +20,7 @@ import {
 	TikzPathCommand,
 } from "../internal"
 import { AdjustDragHandler } from "../snapDrag/dragHandlers"
+import { WireMode, WireModes } from "../utils/wireModes"
 import {
 	lineRectIntersection,
 	pointInsideRect,
@@ -100,6 +101,10 @@ export class WireComponent extends Strokable(PathComponent) {
 
 	// useful for placing
 	private previousPlacingDirection = new SVG.Point(1, 0)
+	/** while placing in the 45° mode: the second to last reference point is the bend of the current segment (not placed yet) */
+	private placingBend = false
+	/** the last cursor position while placing, to redraw the segment when the wire mode changes */
+	private lastPlacingPos: SVG.Point
 
 	// essentially the main visualisation
 	private wire: SVG.Polyline
@@ -338,7 +343,7 @@ export class WireComponent extends Strokable(PathComponent) {
 									pos.sub(this.referencePoints[index - 1]),
 									dirs[index - 1]
 								)
-								this.wireDirections[index - 1] = this.wireDirectionFromDirectionVec(dirs[index - 1], ev)
+								this.wireDirections[index - 1] = this.wireDirectionFromDirectionVec(dirs[index - 1])
 							}
 							if (
 								index < this.adjustmentPoints.length - 1 &&
@@ -348,7 +353,7 @@ export class WireComponent extends Strokable(PathComponent) {
 								let rel = pos.sub(this.referencePoints[index + 1])
 								dirs[index] = this.directionVecFromPos(rel, dirs[index])
 								let dir = dirs[index].x != 0 ? new SVG.Point(0, rel.y) : new SVG.Point(rel.x, 0)
-								this.wireDirections[index] = this.wireDirectionFromDirectionVec(dir, ev)
+								this.wireDirections[index] = this.wireDirectionFromDirectionVec(dir)
 							}
 						}
 						this.referencePoints[index] = pos
@@ -657,18 +662,61 @@ export class WireComponent extends Strokable(PathComponent) {
 	public placeMove(pos: SVG.Point, ev?: MouseEvent): void {
 		//only move the last corner point in the array
 		if (this.referencePoints.length > 1) {
+			this.lastPlacingPos = pos
+			// the bend of the 45° mode is recalculated for every position
+			if (this.placingBend) {
+				this.referencePoints.splice(-2, 1)
+				this.wireDirections.pop()
+				this.placingBend = false
+			}
 			let previousPoint = this.referencePoints.at(-2)
 			let relToPreviousPoint = pos.sub(previousPoint)
 
 			this.previousPlacingDirection = this.directionVecFromPos(relToPreviousPoint, this.previousPlacingDirection)
-			this.wireDirections[this.wireDirections.length - 1] = this.wireDirectionFromDirectionVec(
-				this.previousPlacingDirection,
-				ev
-			)
+			this.wireDirections[this.wireDirections.length - 1] = this.placingDirection(this.previousPlacingDirection)
 
 			this.referencePoints[this.referencePoints.length - 1] = pos
+			if (this.placingMode() == WireMode.Diagonal) {
+				this.insertDiagonalBend(previousPoint, pos)
+			}
 			this.update()
 		}
+	}
+
+	/**
+	 * the wire mode for the current segment: lines and arrows are always free
+	 */
+	private placingMode(): WireMode {
+		return this.onlyStraight ? WireMode.Free : WireModes.mode
+	}
+
+	/**
+	 * the direction of the segment which is currently placed
+	 */
+	private placingDirection(directionVec: SVG.Point): WireDirection {
+		if (this.placingMode() != WireMode.Orthogonal) {
+			return WireDirection.Straight
+		}
+		const direction = this.wireDirectionFromDirectionVec(directionVec)
+		return WireModes.flipped ? oppositeDirection(direction) : direction
+	}
+
+	/**
+	 * 45° mode: a diagonal and a horizontal/vertical part from the previous point to pos, so a bend is inserted before pos.
+	 * Not flipped the diagonal comes first.
+	 */
+	private insertDiagonalBend(previousPoint: SVG.Point, pos: SVG.Point) {
+		const rel = pos.sub(previousPoint)
+		const diagonalLength = Math.min(Math.abs(rel.x), Math.abs(rel.y))
+		if (diagonalLength == 0 || Math.abs(rel.x) == Math.abs(rel.y)) {
+			// purely horizontal, vertical or diagonal: no bend needed
+			return
+		}
+		const diagonal = new SVG.Point(Math.sign(rel.x) * diagonalLength, Math.sign(rel.y) * diagonalLength)
+		const bend = WireModes.flipped ? pos.sub(diagonal) : previousPoint.add(diagonal)
+		this.referencePoints.splice(-1, 0, bend)
+		this.wireDirections.push(WireDirection.Straight)
+		this.placingBend = true
 	}
 
 	/**
@@ -689,14 +737,11 @@ export class WireComponent extends Strokable(PathComponent) {
 		return dir
 	}
 
-	private wireDirectionFromDirectionVec(directionVec: SVG.Point, ev?: MouseEvent | TouchEvent): WireDirection {
-		if (this.onlyStraight || (ev && (ev.ctrlKey || (MainController.instance.isMac && ev.metaKey)))) {
+	private wireDirectionFromDirectionVec(directionVec: SVG.Point): WireDirection {
+		if (this.onlyStraight) {
 			return WireDirection.Straight
-		} else if (directionVec.x != 0) {
-			return WireDirection.HV
-		} else if (directionVec.y != 0) {
-			return WireDirection.VH
 		}
+		return directionVec.x != 0 ? WireDirection.HV : WireDirection.VH
 	}
 
 	public placeStep(pos: SVG.Point): boolean {
@@ -704,14 +749,21 @@ export class WireComponent extends Strokable(PathComponent) {
 			return true
 		}
 		if (this.referencePoints.length > 0) {
+			// the bend of the 45° mode has to match the placed point
+			this.placeMove(pos)
 			//if there already exists a wire, check if the same point was placed twice --> if so, the wire placement should end
-			let previousPoint = this.referencePoints.at(-2) // there is never only one corner point in the array
+			let previousPoint = this.referencePoints.at(this.placingBend ? -3 : -2) // there is never only one corner point in the array
 			if (pos.eq(previousPoint)) {
 				return true
 			}
+			// the bend is now part of the wire
+			this.placingBend = false
 		} else {
 			this.referencePoints.push(pos.clone())
 			this.updateTheme()
+			if (!this.onlyStraight) {
+				WireModes.startPlacing(() => this.lastPlacingPos && this.placeMove(this.lastPlacingPos))
+			}
 		}
 
 		this.referencePoints.push(pos)
@@ -735,9 +787,17 @@ export class WireComponent extends Strokable(PathComponent) {
 			this.placeStep(new SVG.Point())
 		}
 
+		if (!this.onlyStraight) {
+			WireModes.stopPlacing()
+		}
 		// remove the point which was currently being placed (not actually part of the wire)
 		this.referencePoints.pop()
 		this.wireDirections.pop()
+		if (this.placingBend) {
+			this.referencePoints.pop()
+			this.wireDirections.pop()
+			this.placingBend = false
+		}
 		if (this.referencePoints.length >= 2 && this.referencePoints.at(-1).eq(this.referencePoints.at(-2))) {
 			// the last two points where equal -> remove one more
 			this.referencePoints.pop()

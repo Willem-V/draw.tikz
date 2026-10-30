@@ -47,6 +47,7 @@ All controls of the editor are explained in the help menu (circled question mark
 - **SVG export for Office:** text inside symbols (e.g. T, Q and Q̄ on flip-flops) and labels no longer disappear when the exported SVG is used in PowerPoint or Word
 - **Grid switch** at startup now matches whether the grid is visible
 - **Import Ti*k*Z and JSON** (Ctrl/⌘ + O, or Ctrl/⌘ + Shift + O to paste code): load a file or pasted code and replace the drawing or add it to the current one, with a report of everything that could not be converted. Based on the importer that was briefly in CircuiTi*k*Z-Designer, extended with anchors (`(M1.drain)`, `(ic.pin 3)`, `anchor=D`), shifted coordinates, rotation/mirroring, labels, rectangles/ellipses/circles with their line and fill style, and the text of rectangles, so the Ti*k*Z export of this app imports again without changes. Run the importer tests with `npm run test:import`
+- **Wire modes** like in EDA/PCB tools: while drawing a wire, Space switches between orthogonal (horizontal/vertical with one bend), 45° (a diagonal and a straight part) and free (any angle); / flips the bend to the other end of the segment. The mode is remembered
 - No Google Analytics, no Electron desktop app
 
 ## Features
