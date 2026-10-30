@@ -35,7 +35,7 @@ All controls of the editor are explained in the help menu (circled question mark
 
 - **VS Code extension:** edit `*.drawtikz.json` files in VS Code and export straight into the LaTeX project (see above)
 - **Variable sources:** a "Variable" switch on all voltage and current sources draws a diagonal arrow over the symbol (also exported to Ti*k*Z)
-- **Transistor arrow position:** environment setting for `\ctikzset{transistors/arrow pos=...}`, defaulting to the end of the terminal. The canvas symbols for this are generated with [scripts/generateArrowEndSymbols.py](scripts/generateArrowEndSymbols.py)
+- **Transistor arrow:** the environment setting "Transistors" is a choice between two pictures. Arrows of transistors are always at the end of the terminal (`\ctikzset{transistors/arrow pos=end}` is always exported). With arrow (the default) gives MOS transistors an arrow instead of the circle at the gate of a PMOS. Without arrow gives a PMOS an empty circle. A single MOS transistor can overwrite this with its "Style" (arrow, empty or filled circle), so both can be in one drawing. The canvas symbols for the arrow position are generated with [scripts/generateArrowEndSymbols.py](scripts/generateArrowEndSymbols.py)
 - **Enable axes:** the axes can be hidden like the grid; the grid setting is now also restored correctly
 - **Rectangle arrays:** a "Draw as array" switch on rectangles draws extra offset outlines at the top and right (adjustable number of layers and offset), so a rectangle around a device shows an array of devices (also exported to Ti*k*Z)
 - **Rectangles as frames:** unfilled rectangles without text can only be selected at their border, so components inside them can be clicked and the rectangle can be deselected
@@ -52,6 +52,12 @@ All controls of the editor are explained in the help menu (circled question mark
 - **Wire modes** like in EDA/PCB tools: while drawing a wire, Space switches between orthogonal (horizontal/vertical with one bend), 45° (a diagonal and a straight part) and free (any angle); / flips the bend to the other end of the segment. The mode is remembered
 - **Reusable components:** select a part of a drawing and click "Save as component" (properties panel, also on a group) to save it as its own `.drawtikz.json` file. It shows up under "My components" in the symbol picker and is placed like a symbol: it follows the cursor, snaps to the grid, can be rotated and flipped, and a click places it as a group. "Import file..." in the same group places any drawing. In the browser the components are kept in the browser storage; in VS Code they are the files in the component folder of the workspace
 - **Key hints:** a bar at the bottom of the canvas shows the rotate and flip shortcuts while components are selected, placed or dragged, and they now also work during a drag
+- **Properties panel redesign:**
+  - **Grid first:** symbols get a "Size on grid" with − / + buttons that step through the sizes at which their main terminals are on the grid (slightly different x and y scales, e.g. 1.02 × 0.97 for a transistor). Helper and supply pins like `up` and `down` of an op amp stay off the grid. New symbols start at the grid size closest to their normal size if that is within about 15%; the free scale is still there for other sizes
+  - **Steppers instead of sliders:** every number has an input with − / + buttons (Shift+click for fine steps)
+  - **Sections fold:** rarely needed sections (stroke, fill, TikZ name, info, ...) start collapsed, open/closed is remembered
+  - **Compact toolbar** at the top for rotate, flip, drawing order and, for a selection, group, align and distribute
+  - **Plain style settings:** readable names for the environment settings, and the transistor style is picked from two previews
 - No Google Analytics, no Electron desktop app
 
 ## Features

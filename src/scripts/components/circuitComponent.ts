@@ -4,10 +4,11 @@ import {
 	MainController,
 	SnapPoint,
 	SnappingInfo,
-	ButtonGridProperty,
 	CanvasController,
 	SelectionController,
-	SectionHeaderProperty,
+	IconToolbarProperty,
+	layerGroup,
+	transformGroups,
 	GroupComponent,
 	Undo,
 	EditableProperty,
@@ -151,92 +152,31 @@ export abstract class CircuitComponent {
 
 		this.displayName = "Circuit Component"
 		this.properties = new PropertiesCollection()
-		this.addPositioning()
-		this.addZOrdering()
+		this.addToolbar()
 	}
 
 	/**
-	 * Add z-index ordering to the properties window
+	 * the toolbar at the top of the properties window: rotate, flip and drawing order
 	 */
-	private addZOrdering() {
-		// all components should receive the possiblity to change their draw order/z order/depth
-		let ordering = new ButtonGridProperty(
-			2,
-			[
-				["Foreground", ""],
-				["Background", ""],
-				["Forward", ""],
-				["Backward", ""],
-			],
-			[
-				(ev) => CanvasController.instance.componentsToForeground([this]),
-				(ev) => CanvasController.instance.componentsToBackground([this]),
-				(ev) => CanvasController.instance.moveComponentsForward([this]),
-				(ev) => CanvasController.instance.moveComponentsBackward([this]),
-			],
-			false,
-			[
-				"Bring the component to the foreground",
-				"Move the component to the background",
-				"Move the component one step towards the foreground",
-				"Move the component one step towards the background",
-			]
+	private addToolbar() {
+		const transform = transformGroups(
+			(angleDeg) => {
+				this.rotate(angleDeg)
+				Undo.addState()
+			},
+			(horizontalAxis) => {
+				this.flip(horizontalAxis)
+				Undo.addState()
+			},
+			"the component"
 		)
-		this.properties.add(PropertyCategories.ordering, new SectionHeaderProperty("Ordering"))
-		this.properties.add(PropertyCategories.ordering, ordering)
-	}
-
-	/**
-	 * Add rotation and flipping to the properties window
-	 */
-	private addPositioning() {
-		let positioning = new ButtonGridProperty(
-			2,
-			[
-				["Rotate 90° CW", "rotate_right"],
-				["Rotate 90° CCW", "rotate_left"],
-				["Rotate 45° CW", "rotate_right"],
-				["Rotate 45° CCW ", "rotate_left"],
-				["Flip vertically", ["flip", "rotateText"]],
-				["Flip horizontally", "flip"],
-			],
-			[
-				(ev) => {
-					this.rotate(-90)
-					Undo.addState()
-				},
-				(ev) => {
-					this.rotate(90)
-					Undo.addState()
-				},
-				(ev) => {
-					this.rotate(-45)
-					Undo.addState()
-				},
-				(ev) => {
-					this.rotate(45)
-					Undo.addState()
-				},
-				(ev) => {
-					this.flip(true)
-					Undo.addState()
-				},
-				(ev) => {
-					this.flip(false)
-					Undo.addState()
-				},
-			],
-			false,
-			[
-				"Rotate the component 90 degrees clockwise",
-				"Rotate the component 90 degrees counter clockwise",
-				"Rotate the component 45 degrees clockwise",
-				"Rotate the component 45 degrees counter clockwise",
-				"Flip the component around its x-axis",
-				"Flip the component around its y-axis",
-			]
+		const order = layerGroup(
+			() => CanvasController.instance.componentsToForeground([this]),
+			() => CanvasController.instance.moveComponentsForward([this]),
+			() => CanvasController.instance.moveComponentsBackward([this]),
+			() => CanvasController.instance.componentsToBackground([this])
 		)
-		this.properties.add(PropertyCategories.manipulation, positioning)
+		this.properties.add(PropertyCategories.manipulation, new IconToolbarProperty([...transform, order]))
 	}
 
 	/**

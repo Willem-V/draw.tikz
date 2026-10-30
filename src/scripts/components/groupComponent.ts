@@ -1,11 +1,10 @@
 import * as SVG from "@svgdotjs/svg.js"
 import {
-	ButtonGridProperty,
+	IconToolbarProperty,
 	CircuitComponent,
 	ComponentSaveObject,
 	MainController,
 	PropertyCategories,
-	SectionHeaderProperty,
 	SelectionController,
 	SelectionMode,
 	SnappingInfo,
@@ -52,19 +51,29 @@ export class GroupComponent extends CircuitComponent {
 
 		MainController.instance.circuitComponents.splice(firstIndex, 0, this) // added here
 
-		this.properties.add(PropertyCategories.ordering, new SectionHeaderProperty("Grouping"))
-		let grouping = new ButtonGridProperty(
-			2,
+		const grouping = new IconToolbarProperty(
 			[
-				["Ungroup", ""],
-				["Save as component", ""],
+				{
+					label: "Group",
+					buttons: [
+						{
+							icon: "group_off",
+							text: "Ungroup",
+							tooltip: "Dissolve the group",
+							onClick: () => this.ungroup(),
+						},
+						{
+							icon: "bookmark_add",
+							text: "Save as component",
+							tooltip: "Save the group as a component for the symbol picker",
+							onClick: () => ComponentLibrary.instance.save([this]),
+						},
+					],
+				},
 			],
-			[(ev) => this.ungroup(), (ev) => ComponentLibrary.instance.save([this])],
-			undefined,
-			undefined,
 			"ordering:ungroup"
 		)
-		this.properties.add(PropertyCategories.ordering, grouping)
+		this.properties.add(PropertyCategories.manipulation, grouping)
 
 		this.update()
 		SelectionController.instance.selectComponents([this], SelectionMode.RESET)

@@ -1,6 +1,9 @@
 import * as SVG from "@svgdotjs/svg.js"
 import { CanvasController, EditableProperty, Undo } from "../internal"
 
+/**
+ * a number (with unit) edited with an input field and − / + buttons (it was a slider once, hence the name)
+ */
 export class SliderProperty extends EditableProperty<SVG.Number> {
 	public eq(first: SVG.Number, second: SVG.Number): boolean {
 		if (first == null || second == null) {
@@ -13,13 +16,13 @@ export class SliderProperty extends EditableProperty<SVG.Number> {
 	private max: number
 	private step: number
 
-	private label: string
-	private sliderInput: HTMLInputElement
+	/** can be changed until the input is shown */
+	public label: string
+	private decreaseButton: HTMLButtonElement
+	private increaseButton: HTMLButtonElement
 	private numberInput: HTMLInputElement
 	private unitLabel: HTMLLabelElement
 
-	private fractionDigits: number
-	private integerDigits: number
 	private restrictToRange: boolean
 
 	public constructor(
@@ -38,74 +41,73 @@ export class SliderProperty extends EditableProperty<SVG.Number> {
 		this.max = max
 		this.step = step
 		this.restrictToRange = restrictToRange
+	}
 
-		if (step > 0) {
-			this.fractionDigits = 0
-			let stepTemp = step
-			while (stepTemp < 1) {
-				stepTemp *= 10
-				this.fractionDigits += 1
-			}
-		}
+	/**
+	 * how much the − and + buttons change the value. By default a round number (1, 2 or 5 times a power of ten) for about 40
+	 * steps over the range, at least the step of the input. Shift+click changes the value by the step of the input.
+	 */
+	public buttonStep: number
 
-		this.integerDigits = 1
-		let maxDigits = Math.max(Math.abs(min), Math.abs(max))
-		while (maxDigits > 1) {
-			this.integerDigits += 1
-			maxDigits /= 10
-		}
+	private get defaultButtonStep(): number {
+		const rough = (this.max - this.min) / 40
+		const power = 10 ** Math.floor(Math.log10(rough))
+		const nice = [1, 2, 5, 10].map((factor) => factor * power).find((candidate) => candidate >= rough)
+		return Math.max(nice, this.step)
 	}
 
 	public buildHTML(): HTMLElement {
 		let row = this.getRow()
 
 		let col = document.createElement("div") as HTMLDivElement
-		col.classList.add("col-12", "my-0", "input-group")
+		col.classList.add("col-12", "my-0", "input-group", "flex-nowrap")
 
-		let distanceLabel = document.createElement("label") as HTMLLabelElement
-		distanceLabel.classList.add("input-group-text", "fs-6")
-		distanceLabel.innerHTML = this.label
-		distanceLabel.setAttribute("for", "labelDistanceSlider")
-		col.appendChild(distanceLabel)
+		let nameLabel = document.createElement("label") as HTMLLabelElement
+		nameLabel.classList.add("input-group-text", "fs-6", "flex-grow-1")
+		nameLabel.innerHTML = this.label
+		col.appendChild(nameLabel)
 
-		this.sliderInput = document.createElement("input") as HTMLInputElement
-		this.sliderInput.classList.add("form-range", "w-25", "flex-grow-1", "h-100", "px-2", "border")
-		this.sliderInput.id = "labelDistanceSlider"
-		this.sliderInput.type = "range"
-		this.sliderInput.min = this.min.toString()
-		this.sliderInput.max = this.max.toString()
-		this.sliderInput.step = this.step.toString()
-		this.sliderInput.value =
-			!Number.isNaN(this.value.value) ? this.value.value.toString() : ((this.max - this.min) / 2).toString()
-		col.appendChild(this.sliderInput)
+		const stepButton = (symbol: string, direction: -1 | 1) => {
+			const button = document.createElement("button") as HTMLButtonElement
+			button.type = "button"
+			button.classList.add("btn", "btn-outline-secondary", "material-symbols-outlined", "px-2")
+			button.innerText = symbol
+			button.title = direction < 0 ? "Smaller (Shift: fine step)" : "Larger (Shift: fine step)"
+			button.addEventListener("click", (ev) => {
+				if (Number.isNaN(this.value.value)) {
+					return
+				}
+				const step = ev.shiftKey ? this.step : (this.buttonStep ?? this.defaultButtonStep)
+				// go to the next multiple of the step, so values stay round numbers
+				const steps = Math.round(this.value.value / step + direction * 0.5001)
+				this.setFromInput(Math.round(steps * step * 1e6) / 1e6, true)
+				this.updateNumberInput()
+				Undo.addState()
+			})
+			return button
+		}
+		this.decreaseButton = stepButton("remove", -1)
+		col.appendChild(this.decreaseButton)
 
 		this.numberInput = document.createElement("input") as HTMLInputElement
-		this.numberInput.classList.add("form-control", "fs-6")
+		this.numberInput.classList.add("form-control", "fs-6", "text-end", "flex-grow-0")
+		this.numberInput.style.width = "5.5em"
 		this.numberInput.type = "number"
-		this.numberInput.value = !Number.isNaN(this.value.value) ? this.value.value.toString() : "*"
+		this.numberInput.placeholder = "–"
 		this.numberInput.min = this.min.toString()
 		this.numberInput.max = this.max.toString()
 		this.numberInput.step = this.step.toString()
 		col.appendChild(this.numberInput)
 
-		let sliderChanged = () => {
-			this.updateValue(new SVG.Number(Number.parseFloat(this.sliderInput.value), this.value.unit))
-			this.updateNumberInput()
-		}
-		let numberChanged = () => {
+		this.increaseButton = stepButton("add", 1)
+		col.appendChild(this.increaseButton)
+
+		this.numberInput.addEventListener("input", () => {
 			let newValue = Number.parseFloat(this.numberInput.value)
-
 			if (!isNaN(newValue)) {
-				if (this.restrictToRange) {
-					newValue = newValue < this.min ? this.min : newValue
-					newValue = newValue > this.max ? this.max : newValue
-				}
-				this.updateValue(new SVG.Number(newValue, this.value.unit))
-				this.updateSliderInput()
+				this.setFromInput(newValue, this.restrictToRange)
 			}
-		}
-
-		this.numberInput.addEventListener("input", numberChanged)
+		})
 		this.numberInput.addEventListener("focusout", () => {
 			this.updateNumberInput()
 			Undo.addState()
@@ -114,46 +116,45 @@ export class SliderProperty extends EditableProperty<SVG.Number> {
 			CanvasController.instance.draggingFromInput = this.numberInput
 		})
 
-		this.sliderInput.addEventListener("input", sliderChanged)
-		this.sliderInput.addEventListener("change", () => {
-			Undo.addState()
-		})
-
 		if (this.value.unit) {
-			this.unitLabel = distanceLabel.cloneNode(true) as HTMLLabelElement
+			this.unitLabel = document.createElement("label") as HTMLLabelElement
+			this.unitLabel.classList.add("input-group-text", "fs-6")
 			this.unitLabel.innerText = this.value.unit
 			col.appendChild(this.unitLabel)
 		}
 
 		this.updateNumberInput()
-		this.updateSliderInput()
 
 		row.appendChild(col)
 		return row
 	}
 
+	/**
+	 * @param clamp keep the value between min and max
+	 */
+	private setFromInput(newValue: number, clamp: boolean) {
+		if (clamp) {
+			newValue = Math.min(this.max, Math.max(this.min, newValue))
+		}
+		this.updateValue(new SVG.Number(newValue, this.value.unit))
+	}
+
 	protected disable(disabled = true): void {
-		this.sliderInput.disabled = disabled
 		this.numberInput.disabled = disabled
+		this.decreaseButton.disabled = disabled
+		this.increaseButton.disabled = disabled
 	}
 
 	private updateNumberInput() {
-		this.numberInput.value = !Number.isNaN(this.value.value) ? this.value.value.toString() : "*"
-		if (this.unitLabel) {
-			this.unitLabel.innerText = !Number.isNaN(this.value.value) ? this.value.unit : ""
-		}
-	}
-
-	private updateSliderInput() {
-		this.sliderInput.value = !Number.isNaN(this.value.value) ? this.value.value.toString() : "*"
+		// different values of several components: empty with a dash as placeholder
+		this.numberInput.value = !Number.isNaN(this.value.value) ? this.value.value.toString() : ""
 		if (this.unitLabel) {
 			this.unitLabel.innerText = !Number.isNaN(this.value.value) ? this.value.unit : ""
 		}
 	}
 
 	public updateHTML(): void {
-		if (this.sliderInput) {
-			this.updateSliderInput()
+		if (this.numberInput) {
 			this.updateNumberInput()
 		}
 	}
@@ -172,6 +173,7 @@ export class SliderProperty extends EditableProperty<SVG.Number> {
 			this.id
 		)
 
+		result.buttonStep = this.buttonStep
 		result.addChangeListener((ev) => {
 			for (const property of properties) {
 				property.updateValue(ev.value, true, true)

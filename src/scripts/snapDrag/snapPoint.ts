@@ -14,6 +14,7 @@ export class SnapPoint extends SVG.Point {
 	public componentReference: CircuitComponent // to which component this snapPoint belongs
 	private anchorName: string // the name of the snap point (i.e. G, D, S, center...)
 	private relPosition: SVG.Point // the position of this snapPoint relative to the component center
+	public snapsToGrid = true // false: the point snaps to other snap points, but does not align the component to the grid
 
 	private element: SVG.Element
 

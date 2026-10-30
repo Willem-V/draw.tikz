@@ -1,6 +1,6 @@
 import * as SVG from "@svgdotjs/svg.js"
 import { ensureInPx } from "../utils/impSVGNumber"
-import { CanvasController, EnvironmentVariableController } from "../internal"
+import { CanvasController } from "../internal"
 
 /**
  * a point where one can snap to relative to the component position
@@ -41,16 +41,11 @@ export type Variant = {
 }
 
 /**
- * the symbol which should be used for the variant, depending on the global transistor arrow position
+ * the symbol which should be used for the variant: the arrows of transistors are always at the end of the terminal
+ * (\ctikzset{transistors/arrow pos=end}, which the export always sets)
  */
 export function variantSymbol(variant: Variant): SVG.Symbol {
-	if (
-		variant.symbolArrowEnd &&
-		EnvironmentVariableController.instance.getGlobalSettings().transistorArrows == "end"
-	) {
-		return variant.symbolArrowEnd
-	}
-	return variant.symbol
+	return variant.symbolArrowEnd ?? variant.symbol
 }
 
 /**

@@ -141,13 +141,18 @@ export class SnapController {
 		let relSnapPoints = this.movingSnapPoints.map((snapPoint) =>
 			snapPoint.relToComponentAnchor().add(snapPoint.componentReference.position).sub(component.position)
 		)
+		// in the same order as relSnapPoints
+		const snapsToGrid = this.movingSnapPoints.map((snapPoint) => snapPoint.snapsToGrid)
 		if (this.additionalSnapPoints) {
 			relSnapPoints.push(...this.additionalSnapPoints.map((snapPoint) => snapPoint.relToComponentAnchor()))
+			snapsToGrid.push(...this.additionalSnapPoints.map((snapPoint) => snapPoint.snapsToGrid))
 		}
 		if (relSnapPoints.length < 1) {
 			relSnapPoints.push(new SVG.Point())
+			snapsToGrid.push(true)
 		}
 		const movingSnapPoints = relSnapPoints.map((point) => pos.add(point))
+		const gridSnapPoints = movingSnapPoints.filter((_, index) => snapsToGrid[index])
 
 		if (!CanvasController.instance.gridVisible) {
 			// effectively only snap the origin
@@ -155,7 +160,7 @@ export class SnapController {
 		}
 
 		// directly calculate the closest grid snapping point to each possible relSnapPoint and filter which is closest overall
-		let distStruct = movingSnapPoints.reduce<DistStruct>(
+		let distStruct = gridSnapPoints.reduce<DistStruct>(
 			/**
 			 * @param {DistStruct} prevVal - helper struct for finding snap point with lowest dist. to a grid point
 			 * @param {SVG.Point} movSnapPoint - possible point to snap to (grid)
