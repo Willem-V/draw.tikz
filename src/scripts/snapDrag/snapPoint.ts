@@ -25,6 +25,11 @@ export class SnapPoint extends SVG.Point {
 		this.recalculate()
 	}
 
+	/** the name of the anchor (e.g. "D" of a transistor), as in CircuiTikZ */
+	public get anchor(): string {
+		return this.anchorName
+	}
+
 	public recalculate(transformMatrix: SVG.Matrix = this.componentReference.getTransformMatrix()) {
 		const point = this.relPosition.transform(transformMatrix)
 		this.x = point.x

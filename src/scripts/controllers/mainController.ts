@@ -12,6 +12,8 @@ import {
 	ExportController,
 	SelectionController,
 	SaveController,
+	ImportController,
+	ImportReportController,
 	Undo,
 	CopyPaste,
 	PropertyController,
@@ -198,6 +200,10 @@ export class MainController {
 		loadButton.addEventListener("click", SaveController.instance.load.bind(SaveController.instance), {
 			passive: true,
 		})
+
+		// eager-construct so the modal wiring is ready for the first import
+		ImportController.instance
+		ImportReportController.instance
 
 		canvasPromise.then(() => {
 			SelectionController.instance
@@ -880,6 +886,10 @@ export class MainController {
 		})
 		hotkeys("ctrl+o,command+o", () => {
 			SaveController.instance.load()
+			return false
+		})
+		hotkeys("ctrl+shift+o,command+shift+o", () => {
+			ImportController.instance.open("paste", "tikz")
 			return false
 		})
 		hotkeys("ctrl+e,command+e", () => {

@@ -21,6 +21,7 @@
 		"update": "npx npm-check-updates -u",
 		"prepack": "npm run build",
 		"start": "parcel serve --lazy",
+		"test:import": "node --import ./tests/import/register.mjs tests/import/run-import-tests.mjs",
 		"postversion": "git push origin HEAD && node -e \"require('child_process').execSync('git push origin v' + require('./package.json').version, {stdio: 'inherit'})\""
 	},
 	"browserslist": "> 0.5%, last 2 versions, not dead",
