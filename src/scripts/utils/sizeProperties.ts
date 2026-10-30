@@ -9,7 +9,7 @@ export type SizeProperties = {
 
 /**
  * creates the width and height properties of resizable symbols (in circuitikz units) together with a property to lock their aspect ratio
- * @param onChange called after the size changed (also when the other dimension was adjusted to keep the aspect ratio)
+ * @param onChange called after the size changed (also when the other dimension was adjusted to keep the aspect ratio), with the slider the user changed
  * @param options.max the maximum of both sliders
  * @param options.heightLabel the label of the height slider
  * @param options.linked further sizes which are scaled together with width and height if the aspect ratio is locked
@@ -19,7 +19,7 @@ export function createSizeProperties(
 	defaultHeight: number,
 	tooltip: string,
 	idPrefix: string,
-	onChange: () => void,
+	onChange: (changed: SliderProperty) => void,
 	options: { max?: number; heightLabel?: string; linked?: SliderProperty[] } = {}
 ): SizeProperties {
 	const max = options.max ?? 10
@@ -60,7 +60,7 @@ export function createSizeProperties(
 				property.updateValue(new SVG.Number(value), true, false)
 			}
 		}
-		onChange()
+		onChange(changed)
 	}
 	width.addChangeListener((ev) => keepRatio(width, height, ev.previousValue))
 	height.addChangeListener((ev) => keepRatio(height, width, ev.previousValue))

@@ -8,10 +8,10 @@ import {
 	GroupComponent,
 	IconToolbarProperty,
 	MainController,
-	orderButtons,
+	layerGroup,
 	SectionHeaderProperty,
 	SelectionController,
-	transformButtons,
+	transformGroups,
 	Undo,
 } from "../internal"
 
@@ -110,7 +110,7 @@ export class PropertyController {
 		this.propertiesTitle.innerText = "Selection"
 
 		const selection = SelectionController.instance
-		const transform = transformButtons(
+		const transform = transformGroups(
 			(angleDeg) => {
 				selection.rotateSelection(angleDeg)
 				Undo.addState()
@@ -121,7 +121,7 @@ export class PropertyController {
 			},
 			"the selection"
 		)
-		const order = orderButtons(
+		const order = layerGroup(
 			() => CanvasController.instance.componentsToForeground(selection.currentlySelectedComponents),
 			() => CanvasController.instance.moveComponentsForward(selection.currentlySelectedComponents),
 			() => CanvasController.instance.moveComponentsBackward(selection.currentlySelectedComponents),
@@ -133,52 +133,61 @@ export class PropertyController {
 		const toolbar = new IconToolbarProperty([
 			...transform,
 			order,
-			[
-				{
-					icon: "group_work",
-					text: "Group",
-					tooltip: "Group the components, so they are moved and selected together",
-					onClick: () => GroupComponent.group(selection.currentlySelectedComponents),
-				},
-			],
-			[
-				{ icon: "align_horizontal_left", tooltip: "Align left", onClick: align(AlignmentMode.START, true) },
-				{
-					icon: "align_horizontal_center",
-					tooltip: "Align centers horizontally",
-					onClick: align(AlignmentMode.CENTER, true),
-				},
-				{ icon: "align_horizontal_right", tooltip: "Align right", onClick: align(AlignmentMode.END, true) },
-				{ icon: "align_vertical_top", tooltip: "Align top", onClick: align(AlignmentMode.START, false) },
-				{
-					icon: "align_vertical_center",
-					tooltip: "Align centers vertically",
-					onClick: align(AlignmentMode.CENTER, false),
-				},
-				{ icon: "align_vertical_bottom", tooltip: "Align bottom", onClick: align(AlignmentMode.END, false) },
-			],
-			[
-				{
-					icon: "horizontal_distribute",
-					tooltip: "Distribute the centers horizontally",
-					onClick: distribute(DistributionMode.CENTER, true),
-				},
-				{
-					icon: "align_justify_space_even",
-					tooltip: "Equal horizontal spacing",
-					onClick: distribute(DistributionMode.SPACE, true),
-				},
-				{
-					icon: "vertical_distribute",
-					tooltip: "Distribute the centers vertically",
-					onClick: distribute(DistributionMode.CENTER, false),
-				},
-				{
-					icon: "align_space_even",
-					tooltip: "Equal vertical spacing",
-					onClick: distribute(DistributionMode.SPACE, false),
-				},
-			],
+			{
+				label: "Group",
+				buttons: [
+					{
+						icon: "group_work",
+						text: "Group",
+						tooltip: "Group the components, so they are moved and selected together",
+						onClick: () => GroupComponent.group(selection.currentlySelectedComponents),
+					},
+				],
+			},
+			{
+				label: "Align",
+				buttons: [
+					{ icon: "align_horizontal_left", tooltip: "Align left", onClick: align(AlignmentMode.START, true) },
+					{
+						icon: "align_horizontal_center",
+						tooltip: "Align centers horizontally",
+						onClick: align(AlignmentMode.CENTER, true),
+					},
+					{ icon: "align_horizontal_right", tooltip: "Align right", onClick: align(AlignmentMode.END, true) },
+					{ icon: "align_vertical_top", tooltip: "Align top", onClick: align(AlignmentMode.START, false) },
+					{
+						icon: "align_vertical_center",
+						tooltip: "Align centers vertically",
+						onClick: align(AlignmentMode.CENTER, false),
+					},
+					{ icon: "align_vertical_bottom", tooltip: "Align bottom", onClick: align(AlignmentMode.END, false) },
+				],
+			},
+			{
+				label: "Distribute",
+				buttons: [
+					{
+						icon: "horizontal_distribute",
+						tooltip: "Distribute the centers horizontally",
+						onClick: distribute(DistributionMode.CENTER, true),
+					},
+					{
+						icon: "align_justify_space_even",
+						tooltip: "Equal horizontal spacing",
+						onClick: distribute(DistributionMode.SPACE, true),
+					},
+					{
+						icon: "vertical_distribute",
+						tooltip: "Distribute the centers vertically",
+						onClick: distribute(DistributionMode.CENTER, false),
+					},
+					{
+						icon: "align_space_even",
+						tooltip: "Equal vertical spacing",
+						onClick: distribute(DistributionMode.SPACE, false),
+					},
+				],
+			},
 		])
 		const rows: HTMLElement[] = [toolbar.getHTMLElement()]
 		this.propertiesEntries.append(...rows)

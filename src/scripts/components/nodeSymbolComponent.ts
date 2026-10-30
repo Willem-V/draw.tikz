@@ -32,11 +32,18 @@ import {
 } from "../internal"
 import { resizeSVG, roundTikz, selectedBoxWidth } from "../utils/selectionHelper"
 import { createSizeProperties, SizeProperties } from "../utils/sizeProperties"
-import { gridScales, gridSpacingPx, mainPins, maxDefaultSizeChange, roundScale } from "../utils/gridFit"
+import { closestMuxGridSize, muxGridSizes, muxLead, MuxShape, pinSides, PinSide } from "../utils/muxGrid"
+import { alwaysOnGrid, gridScales, gridSpacingPx, mainPins, maxDefaultSizeChange, roundScale } from "../utils/gridFit"
 
 // TODO don't use <use> element as the component visualisation, but directly the symbol's children
 
-type ShapeSizeSaveObject = { width?: number; height?: number; rightHeight?: number; lockAspectRatio?: boolean }
+type ShapeSizeSaveObject = {
+	width?: number
+	height?: number
+	rightHeight?: number
+	lockAspectRatio?: boolean
+	gridSnap?: boolean
+}
 
 export type NodeSymbolSaveObject = NodeSaveObject & {
 	id: string
@@ -91,8 +98,6 @@ const portInputs = 2
  */
 type MuxdemuxKind = "pinBlock" | "mux"
 const muxdemuxNames: Record<MuxdemuxKind, string> = { pinBlock: "muxdemux", mux: "mux" }
-const pinSides = ["left", "right", "top", "bottom"] as const
-type PinSide = (typeof pinSides)[number]
 /**
  * the sizes are given like w, Lh and Rh in muxdemux def
  */
@@ -108,17 +113,18 @@ const muxdemuxDefaults: Record<
  */
 const muxdemuxUnit = 0.4 * portSizeUnit
 /**
- * multipoles/external pins width
+ * the leads of the pins are one grid step long (multipoles/external pins width, which is exported), so the pins are on the grid
+ * when the box is
  */
-const muxdemuxLeadLength = 0.2 * portSizeUnit
+const muxdemuxLeadLength = () => gridSpacingPx()
 /**
  * the muxdemux def key for the number of pins, the anchor name and the outward direction (y upwards) of each side
  */
-const pinSideInfo: Record<PinSide, { key: string; anchor: string; direction: SVG.Point }> = {
-	left: { key: "NL", anchor: "lpin", direction: new SVG.Point(-1, 0) },
-	right: { key: "NR", anchor: "rpin", direction: new SVG.Point(1, 0) },
-	top: { key: "NT", anchor: "tpin", direction: new SVG.Point(0, 1) },
-	bottom: { key: "NB", anchor: "bpin", direction: new SVG.Point(0, -1) },
+const pinSideInfo: Record<PinSide, { key: string; anchor: string }> = {
+	left: { key: "NL", anchor: "lpin" },
+	right: { key: "NR", anchor: "rpin" },
+	top: { key: "NT", anchor: "tpin" },
+	bottom: { key: "NB", anchor: "bpin" },
 }
 
 type ShapeKind = "port" | MuxdemuxKind
@@ -183,6 +189,7 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 	/**
 	 * only available for the mux: the height of the right side (Rh), the height property is the left side (Lh)
 	 */
+	private muxGridSnap: BooleanProperty
 	private muxRightHeight: SliderProperty
 	/**
 	 * only available for the mux: if the pins on the slanted sides stick out straight
@@ -238,7 +245,7 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 						height,
 						"Relative to 0.56cm, as w and Lh of the circuitikz muxdemux (without the leads). Can also be changed with the handles on the block.",
 						"manipulation:pinBlock",
-						() => this.updateOptions(),
+						(changed) => this.sizeChanged(changed),
 						{ max: 40 }
 					)
 				:	createSizeProperties(
@@ -246,7 +253,7 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 						height,
 						"Relative to 0.56cm, as w and Lh of the circuitikz muxdemux (without the leads). Can also be changed with the handles on the mux.",
 						"manipulation:mux",
-						() => this.updateOptions(),
+						(changed) => this.sizeChanged(changed),
 						{ max: 40, heightLabel: "Left height", linked: [this.createMuxRightHeight()] }
 					)
 			this.properties.add(PropertyCategories.manipulation, this.shapeSize.width)
@@ -255,6 +262,17 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 				this.properties.add(PropertyCategories.manipulation, this.muxRightHeight)
 			}
 			this.properties.add(PropertyCategories.manipulation, this.shapeSize.lockAspectRatio)
+			if (this.isMuxdemux()) {
+				this.muxGridSnap = new BooleanProperty(
+					"Snap size to grid",
+					true,
+					undefined,
+					"Only allow sizes at which all pins are on the grid. Not possible for every number of pins.",
+					"manipulation:muxGridSnap"
+				)
+				this.muxGridSnap.addChangeListener(() => this.sizeChanged())
+				this.properties.add(PropertyCategories.manipulation, this.muxGridSnap)
+			}
 		} else {
 			this.gridSizeProperty = new GridSizeProperty(() => this.gridScales(), new SVG.Point(1, 1))
 			this.gridSizeProperty.addChangeListener((ev) => this.applyGridSize(ev.value))
@@ -281,7 +299,13 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 						["default", "arrow", "emptyCircle", "filledCircle"]
 					:	["default", "arrow", "none"]
 				const entries = styles.map((style) => ({ key: style, name: transistorStyleNames[style] }))
-				this.transistorStyle = new ChoiceProperty("Style", entries, entries[0], undefined, "options:transistorStyle")
+				this.transistorStyle = new ChoiceProperty(
+					"Style",
+					entries,
+					entries[0],
+					undefined,
+					"options:transistorStyle"
+				)
 				this.transistorStyle.addChangeListener(() => this.updateOptions())
 				this.properties.add(PropertyCategories.options, this.transistorStyle)
 			}
@@ -327,7 +351,10 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 		}
 
 		if (this.isMuxdemux()) {
-			this.properties.add(PropertyCategories.options, new SectionHeaderProperty("Pins", undefined, "options:pins"))
+			this.properties.add(
+				PropertyCategories.options,
+				new SectionHeaderProperty("Pins", undefined, "options:pins")
+			)
 			this.pinCounts = {} as Record<PinSide, SliderProperty>
 			for (const side of pinSides) {
 				const property = new SliderProperty(
@@ -340,9 +367,7 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 					"Number of pins on the " + side + " side",
 					"options:pins_" + side
 				)
-				property.addChangeListener((ev) => {
-					this.updateOptions()
-				})
+				property.addChangeListener(() => this.sizeChanged())
 				this.pinCounts[side] = property
 				this.properties.add(PropertyCategories.options, property)
 			}
@@ -354,13 +379,15 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 					"The pins on the slanted top and bottom side stick out straight up/down to the same height (square pins=1)",
 					"options:squarePins"
 				)
-				this.muxSquarePins.addChangeListener((ev) => {
-					this.updateOptions()
-				})
+				this.muxSquarePins.addChangeListener(() => this.sizeChanged())
 				this.properties.add(PropertyCategories.options, this.muxSquarePins)
 			}
 		}
 
+		if (this.isMuxdemux()) {
+			// grid first: a new mux or block starts at a size with all pins on the grid
+			this.snapSizeToGrid()
+		}
 		this.componentVariant = symbol.getVariant(this.optionsFromProperties())
 		if (this.shapeKind) {
 			this.shapeSymbol = CanvasController.instance.canvas.defs().symbol()
@@ -406,7 +433,8 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 		}
 		const deviation = (scale: SVG.Point) => Math.abs(Math.log(scale.x)) + Math.abs(Math.log(scale.y))
 		const closest = scales.reduce((best, scale) => (deviation(scale) < deviation(best) ? scale : best))
-		if (Math.max(Math.abs(Math.log(closest.x)), Math.abs(Math.log(closest.y))) > maxDefaultSizeChange) {
+		const sizeChange = Math.max(Math.abs(Math.log(closest.x)), Math.abs(Math.log(closest.y)))
+		if (sizeChange > maxDefaultSizeChange && !alwaysOnGrid.includes(this.referenceSymbol.tikzName)) {
 			return
 		}
 		this.scaleState = new SVG.Point(roundScale(closest.x), roundScale(closest.y))
@@ -432,9 +460,7 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 			"Relative to 0.56cm, as Rh of the circuitikz muxdemux. Can also be changed with the handles on the right side of the mux.",
 			"manipulation:mux:rightHeight"
 		)
-		this.muxRightHeight.addChangeListener((ev) => {
-			this.updateOptions()
-		})
+		this.muxRightHeight.addChangeListener(() => this.sizeChanged(this.muxRightHeight))
 		return this.muxRightHeight
 	}
 
@@ -491,7 +517,7 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 		const inputY = (index: number) => up + step / 2 - index * step
 
 		this.shapeSymbol.clear()
-		const g = this.shapeSymbol.group().attr({ stroke: defaultStroke, "stroke-miterlimit": 10 })
+		const g = this.shapeSymbol.group().attr({ "stroke": defaultStroke, "stroke-miterlimit": 10 })
 		const boxCorner = toSymbol(-portReserved * right, up)
 		// transparent area, such that the port can also be selected by clicking inside
 		g.rect(2 * portReserved * right, 2 * up)
@@ -533,7 +559,10 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 			symbol: this.shapeSymbol,
 			symbolArrowEnd: undefined,
 			pins: pins,
-			textPosition: { ...anchor("text", toSymbol(0, 0)), isDefault: baseVariant.textPosition?.isDefault ?? false },
+			textPosition: {
+				...anchor("text", toSymbol(0, 0)),
+				isDefault: baseVariant.textPosition?.isDefault ?? false,
+			},
 			maxStroke: portThickStroke,
 		}
 	}
@@ -553,34 +582,67 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 	}
 
 	/**
-	 * the y coordinate of the top side of the box at x (the bottom side is the mirrored top side)
+	 * the size, pin count or pin style of a mux or block changed: with snapping, moves to the closest size with all pins on
+	 * the grid before updating
+	 * @param changed the size slider the user changed, which has priority over the other sizes
 	 */
-	private muxdemuxTopAt(x: number): number {
-		const half = this.shapeHalfSize()
-		return half.y + ((x + half.x) / (2 * half.x)) * (this.muxdemuxRightHalfHeight() - half.y)
+	private sizeChanged(changed?: SliderProperty) {
+		if (this.muxGridSnap?.value) {
+			this.snapSizeToGrid(changed)
+		}
+		this.updateOptions()
+	}
+
+	private snapSizeToGrid(changed?: SliderProperty) {
+		const equalHeights = this.shapeKind != "mux"
+		const unit = muxdemuxUnit / gridSpacingPx()
+		const counts = Object.fromEntries(pinSides.map((side) => [side, this.pinCount(side)])) as Record<
+			PinSide,
+			number
+		>
+		const sizes = muxGridSizes(counts, this.muxSquarePins?.value ?? false, equalHeights)
+		const left = this.shapeSize.height.value.value * unit
+		const wanted = {
+			width: this.shapeSize.width.value.value * unit,
+			leftHeight: left,
+			rightHeight: equalHeights ? left : this.muxRightHeight.value.value * unit,
+		}
+		// the changed size has to follow the user, the others adjust
+		const weights = { width: 1, leftHeight: 1, rightHeight: 1 }
+		if (changed === this.shapeSize.width) weights.width = 100
+		if (changed === this.shapeSize.height) weights.leftHeight = 100
+		if (changed === this.muxRightHeight) weights.rightHeight = 100
+		const size = closestMuxGridSize(sizes, wanted, weights)
+		if (!size) {
+			return
+		}
+		// don't notify the listeners, this is part of the change
+		const set = (property: SliderProperty, steps: number) =>
+			property.updateValue(new SVG.Number(Math.round((steps / unit) * 10000) / 10000), true, false)
+		set(this.shapeSize.width, size.width)
+		set(this.shapeSize.height, size.leftHeight)
+		if (!equalHeights) {
+			set(this.muxRightHeight, size.rightHeight)
+		}
 	}
 
 	/**
-	 * the lead of a pin in circuitikz shape coordinates, see the muxdemux shape in pgfcircmultipoles.tex
-	 * @param index the pin number, starting at 1 (top to bottom on the left and right side, left to right on the top and bottom side)
-	 * @returns the start of the lead on the box and its end (the anchor)
+	 * the shape in circuitikz shape coordinates (px)
 	 */
-	private muxdemuxLead(side: PinSide, index: number): [SVG.Point, SVG.Point] {
+	private muxdemuxShape(): MuxShape {
 		const half = this.shapeHalfSize()
-		const direction = pinSideInfo[side].direction
-		const count = this.pinCount(side)
-		if (direction.x) {
-			const sideHalfHeight = direction.x < 0 ? half.y : this.muxdemuxRightHalfHeight()
-			const start = new SVG.Point(direction.x * half.x, sideHalfHeight - ((index - 0.5) * 2 * sideHalfHeight) / count)
-			return [start, start.add(direction.mul(muxdemuxLeadLength))]
+		return {
+			halfWidth: half.x,
+			leftHalfHeight: half.y,
+			rightHalfHeight: this.muxdemuxRightHalfHeight(),
+			counts: Object.fromEntries(pinSides.map((side) => [side, this.pinCount(side)])) as Record<PinSide, number>,
+			squarePins: this.muxSquarePins?.value ?? false,
+			lead: muxdemuxLeadLength(),
 		}
-		const x = -half.x + ((index - 0.5) * 2 * half.x) / count
-		const start = new SVG.Point(x, direction.y * this.muxdemuxTopAt(x))
-		if (this.muxSquarePins?.value) {
-			const outer = Math.max(half.y, this.muxdemuxRightHalfHeight()) + muxdemuxLeadLength
-			return [start, new SVG.Point(x, direction.y * outer)]
-		}
-		return [start, start.add(direction.mul(muxdemuxLeadLength))]
+	}
+
+	private muxdemuxLead(side: PinSide, index: number): [SVG.Point, SVG.Point] {
+		return muxLead(this.muxdemuxShape(), side, index)
 	}
 
 	/**
@@ -616,7 +678,7 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 		const toSymbol = (point: SVG.Point) => this.muxdemuxShapeToSymbol(point)
 
 		this.shapeSymbol.clear()
-		const g = this.shapeSymbol.group().attr({ stroke: defaultStroke, "stroke-miterlimit": 10 })
+		const g = this.shapeSymbol.group().attr({ "stroke": defaultStroke, "stroke-miterlimit": 10 })
 		const corners = [
 			new SVG.Point(-half.x, half.y),
 			new SVG.Point(half.x, rightHalfHeight),
@@ -677,12 +739,14 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 			for (const direction of directions) {
 				const element = resizeSVG()
 				element.node.style.cursor = direction.y ? "ns-resize" : "ew-resize"
-				const currentSize = () => [size.width, size.height, this.muxRightHeight].map((property) => property?.value.value)
+				const currentSize = () =>
+					[size.width, size.height, this.muxRightHeight].map((property) => property?.value.value)
 				let startSize: number[]
 				// the opposite side of the port stays in place when changing the width
 				let fixedPoint: SVG.Point
 				const size = this.shapeSize
-				const rounded = (value: number, min: number) => new SVG.Number(Math.max(min, Math.round(value * 1000) / 1000))
+				const rounded = (value: number, min: number) =>
+					new SVG.Number(Math.max(min, Math.round(value * 1000) / 1000))
 				AdjustDragHandler.snapDrag(this, element, true, {
 					dragStart: (pos) => {
 						startSize = currentSize()
@@ -699,7 +763,10 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 							size.width.updateValue(rounded(width, 0.2), true)
 							this.moveRel(fixedPoint.sub(this.shapeHandlePoint(direction.mul(-1))))
 						} else if (!direction.y) {
-							size.width.updateValue(rounded((2 * Math.abs(local.x - center.x)) / this.shapeUnit(), 0.1), true)
+							size.width.updateValue(
+								rounded((2 * Math.abs(local.x - center.x)) / this.shapeUnit(), 0.1),
+								true
+							)
 						} else if (direction.x > 0) {
 							this.muxRightHeight.updateValue(height, true)
 						} else {
@@ -877,7 +944,13 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 		const grid = gridSpacingPx()
 		let cached = NodeSymbolComponent.gridScalesCache.get(this.componentVariant)
 		if (cached?.grid !== grid) {
-			cached = { grid, scales: gridScales(mainPins(this.componentVariant.pins).map((pin) => pin.point), grid) }
+			cached = {
+				grid,
+				scales: gridScales(
+					mainPins(this.componentVariant.pins).map((pin) => pin.point),
+					grid
+				),
+			}
 			NodeSymbolComponent.gridScalesCache.set(this.componentVariant, cached)
 		}
 		return cached.scales
@@ -980,6 +1053,9 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 			if (this.shapeSize.lockAspectRatio.value) {
 				size.lockAspectRatio = true
 			}
+			if (this.muxGridSnap?.value) {
+				size.gridSnap = true
+			}
 			if (Object.keys(size).length > 0) {
 				data[this.shapeKind == "port" ? "portSize" : "blockSize"] = size
 			}
@@ -1025,9 +1101,11 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 			}
 		} else if (this.isMuxdemux()) {
 			// all values are given, since they differ from the muxdemux defaults
+			// the leads are one grid step long
+			command.options.push("external pins width=" + +(muxdemuxLeadLength() / portSizeUnit).toFixed(5))
 			const definition = [
 				"Lh=" + roundTikz(this.shapeSize.height.value.value),
-				"Rh=" + roundTikz(this.muxdemuxRightHalfHeight() * 2 / muxdemuxUnit),
+				"Rh=" + roundTikz((this.muxdemuxRightHalfHeight() * 2) / muxdemuxUnit),
 				"w=" + roundTikz(this.shapeSize.width.value.value),
 			]
 			for (const side of pinSides) {
@@ -1049,13 +1127,19 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 			this.shapeSize.width.value = new SVG.Number(size?.width ?? defaultWidth)
 			this.shapeSize.height.value = new SVG.Number(size?.height ?? defaultHeight)
 			this.shapeSize.lockAspectRatio.value = size?.lockAspectRatio ?? false
+			if (this.muxGridSnap) {
+				// drawings from before the option keep their sizes
+				this.muxGridSnap.value = size?.gridSnap ?? false
+			}
 			if (this.muxRightHeight) {
 				this.muxRightHeight.value = new SVG.Number(size?.rightHeight ?? muxdemuxDefaults.mux.rightHeight)
 			}
 		}
 		if (this.pinCounts) {
 			for (const side of pinSides) {
-				this.pinCounts[side].value = new SVG.Number(saveObject.pins?.[side] ?? this.muxdemuxDefaults().pins[side])
+				this.pinCounts[side].value = new SVG.Number(
+					saveObject.pins?.[side] ?? this.muxdemuxDefaults().pins[side]
+				)
 			}
 		}
 		if (this.muxSquarePins) {

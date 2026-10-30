@@ -15,6 +15,12 @@ const maxDistortion = 0.1
 /** a new symbol only starts at a grid size this close to its normal size (as log of the scale, about 15%) */
 export const maxDefaultSizeChange = 0.15
 /**
+ * symbols which always start at a grid size, however far it is from their normal size: their terminals are far off the grid
+ * at the normal size
+ */
+export const alwaysOnGrid = ["en amp", "inst amp ra"]
+
+/**
  * pins which do not count for the grid: helper anchors and supply pins. They are too close to the main terminals for both
  * to be on the grid, e.g. "up" of an op amp is 0.2 grid steps away from the height of "-".
  */

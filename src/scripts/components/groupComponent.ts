@@ -45,7 +45,19 @@ export class GroupComponent extends CircuitComponent {
 		MainController.instance.circuitComponents.splice(firstIndex, 0, this) // added here
 
 		const grouping = new IconToolbarProperty(
-			[[{ icon: "group_off", text: "Ungroup", tooltip: "Dissolve the group", onClick: () => this.ungroup() }]],
+			[
+				{
+					label: "Group",
+					buttons: [
+						{
+							icon: "group_off",
+							text: "Ungroup",
+							tooltip: "Dissolve the group",
+							onClick: () => this.ungroup(),
+						},
+					],
+				},
+			],
 			"ordering:ungroup"
 		)
 		this.properties.add(PropertyCategories.manipulation, grouping)

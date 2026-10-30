@@ -6,7 +6,7 @@ import { EditableProperty } from "../internal"
 export type ToolbarButton = {
 	/** name of a Material Symbol */
 	icon: string
-	/** short text next to the icon, e.g. "45°" */
+	/** short text under the icon, e.g. "90°". Without it only the icon is shown */
 	text?: string
 	/** extra classes for the icon, e.g. "rotateText" to turn it by 90° */
 	iconClasses?: string[]
@@ -15,13 +15,21 @@ export type ToolbarButton = {
 }
 
 /**
- * one row of small icon buttons, in groups (e.g. rotate | flip | order). Wraps on narrow panels.
+ * a captioned row of buttons which belong together, e.g. "Rotate" or "Layer"
+ */
+export type ToolbarGroup = {
+	label: string
+	buttons: ToolbarButton[]
+}
+
+/**
+ * the tools at the top of the properties window: rows of icon buttons, each row with a caption (Rotate, Flip, Layer, ...)
  */
 export class IconToolbarProperty extends EditableProperty<never> {
-	private groups: ToolbarButton[][]
+	private groups: ToolbarGroup[]
 	private buttons: HTMLButtonElement[] = []
 
-	public constructor(groups: ToolbarButton[][], id = "") {
+	public constructor(groups: ToolbarGroup[], id = "") {
 		super(undefined as never, "", id)
 		this.groups = groups
 	}
@@ -33,16 +41,20 @@ export class IconToolbarProperty extends EditableProperty<never> {
 	public buildHTML(): HTMLElement {
 		const row = this.getRow()
 		const toolbar = document.createElement("div")
-		toolbar.classList.add("col-12", "btn-toolbar", "gap-2", "propertyToolbar")
+		toolbar.classList.add("col-12", "propertyToolbar")
 		toolbar.setAttribute("role", "toolbar")
 		for (const group of this.groups) {
+			const caption = document.createElement("div")
+			caption.classList.add("propertyToolbarCaption")
+			caption.innerText = group.label
 			const groupElement = document.createElement("div")
-			groupElement.classList.add("btn-group")
+			groupElement.classList.add("btn-group", "w-100")
 			groupElement.setAttribute("role", "group")
-			for (const definition of group) {
+			groupElement.setAttribute("aria-label", group.label)
+			for (const definition of group.buttons) {
 				const button = document.createElement("button")
 				button.type = "button"
-				button.classList.add("btn", "btn-outline-primary", "d-flex", "align-items-center", "gap-1", "px-2")
+				button.classList.add("btn", "btn-outline-secondary", "propertyToolbarButton")
 				button.setAttribute("aria-label", definition.tooltip)
 				button.setAttribute("data-bs-title", definition.tooltip)
 				button.setAttribute("data-bs-toggle", "tooltip")
@@ -59,7 +71,7 @@ export class IconToolbarProperty extends EditableProperty<never> {
 				this.buttons.push(button)
 				groupElement.appendChild(button)
 			}
-			toolbar.appendChild(groupElement)
+			toolbar.append(caption, groupElement)
 		}
 		row.appendChild(toolbar)
 		return row
@@ -79,50 +91,85 @@ export class IconToolbarProperty extends EditableProperty<never> {
 }
 
 /**
- * the rotate and flip buttons for a component or the selection
+ * the rotate and flip rows for a component or the selection
  */
-export function transformButtons(
+export function transformGroups(
 	rotate: (angleDeg: number) => void,
 	flip: (horizontalAxis: boolean) => void,
 	what: string
-): ToolbarButton[][] {
+): ToolbarGroup[] {
 	return [
-		[
-			{ icon: "rotate_left", tooltip: `Rotate ${what} 90° counter clockwise`, onClick: () => rotate(90) },
-			{ icon: "rotate_right", tooltip: `Rotate ${what} 90° clockwise`, onClick: () => rotate(-90) },
-			{
-				icon: "rotate_left",
-				text: "45°",
-				tooltip: `Rotate ${what} 45° counter clockwise`,
-				onClick: () => rotate(45),
-			},
-			{ icon: "rotate_right", text: "45°", tooltip: `Rotate ${what} 45° clockwise`, onClick: () => rotate(-45) },
-		],
-		[
-			{
-				icon: "flip",
-				iconClasses: ["rotateText"],
-				tooltip: `Flip ${what} vertically`,
-				onClick: () => flip(true),
-			},
-			{ icon: "flip", tooltip: `Flip ${what} horizontally`, onClick: () => flip(false) },
-		],
+		{
+			label: "Rotate",
+			buttons: [
+				{
+					icon: "rotate_left",
+					text: "90°",
+					tooltip: `Rotate ${what} 90° counter clockwise`,
+					onClick: () => rotate(90),
+				},
+				{
+					icon: "rotate_right",
+					text: "90°",
+					tooltip: `Rotate ${what} 90° clockwise`,
+					onClick: () => rotate(-90),
+				},
+				{
+					icon: "rotate_left",
+					text: "45°",
+					tooltip: `Rotate ${what} 45° counter clockwise`,
+					onClick: () => rotate(45),
+				},
+				{
+					icon: "rotate_right",
+					text: "45°",
+					tooltip: `Rotate ${what} 45° clockwise`,
+					onClick: () => rotate(-45),
+				},
+			],
+		},
+		{
+			label: "Flip",
+			buttons: [
+				{
+					icon: "flip",
+					iconClasses: ["rotateText"],
+					text: "Vertical",
+					tooltip: `Flip ${what} vertically (mirror at the horizontal axis)`,
+					onClick: () => flip(true),
+				},
+				{
+					icon: "flip",
+					text: "Horizontal",
+					tooltip: `Flip ${what} horizontally (mirror at the vertical axis)`,
+					onClick: () => flip(false),
+				},
+			],
+		},
 	]
 }
 
 /**
- * the buttons which change the drawing order of components
+ * the row which changes the drawing order of components: what is in front covers what is behind it
  */
-export function orderButtons(
+export function layerGroup(
 	toForeground: () => void,
 	forward: () => void,
 	backward: () => void,
 	toBackground: () => void
-): ToolbarButton[] {
-	return [
-		{ icon: "flip_to_front", tooltip: "Bring to the foreground", onClick: toForeground },
-		{ icon: "arrow_upward", tooltip: "One step towards the foreground", onClick: forward },
-		{ icon: "arrow_downward", tooltip: "One step towards the background", onClick: backward },
-		{ icon: "flip_to_back", tooltip: "Move to the background", onClick: toBackground },
-	]
+): ToolbarGroup {
+	return {
+		label: "Layer",
+		buttons: [
+			{
+				icon: "flip_to_front",
+				text: "To front",
+				tooltip: "Bring to the front of everything",
+				onClick: toForeground,
+			},
+			{ icon: "move_up", text: "Forward", tooltip: "One layer forward", onClick: forward },
+			{ icon: "move_down", text: "Backward", tooltip: "One layer backward", onClick: backward },
+			{ icon: "flip_to_back", text: "To back", tooltip: "Send behind everything", onClick: toBackground },
+		],
+	}
 }

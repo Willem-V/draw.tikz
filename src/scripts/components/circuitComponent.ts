@@ -7,8 +7,8 @@ import {
 	CanvasController,
 	SelectionController,
 	IconToolbarProperty,
-	orderButtons,
-	transformButtons,
+	layerGroup,
+	transformGroups,
 	GroupComponent,
 	Undo,
 	EditableProperty,
@@ -159,7 +159,7 @@ export abstract class CircuitComponent {
 	 * the toolbar at the top of the properties window: rotate, flip and drawing order
 	 */
 	private addToolbar() {
-		const transform = transformButtons(
+		const transform = transformGroups(
 			(angleDeg) => {
 				this.rotate(angleDeg)
 				Undo.addState()
@@ -170,7 +170,7 @@ export abstract class CircuitComponent {
 			},
 			"the component"
 		)
-		const order = orderButtons(
+		const order = layerGroup(
 			() => CanvasController.instance.componentsToForeground([this]),
 			() => CanvasController.instance.moveComponentsForward([this]),
 			() => CanvasController.instance.moveComponentsBackward([this]),

@@ -151,3 +151,75 @@ body {
 .choicePreview svg {
 	display: block;
 }
+// the pictures keep the text colour in every state, the selected choice gets a frame
+[role="radio"].btn {
+	--bs-btn-color: var(--bs-emphasis-color);
+	--bs-btn-hover-color: var(--bs-emphasis-color);
+	--bs-btn-active-color: var(--bs-emphasis-color);
+	--bs-btn-active-bg: var(--bs-secondary-bg);
+	--bs-btn-active-border-color: var(--bs-emphasis-color);
+	&.active {
+		border-width: 2px;
+	}
+}
+
+// properties window: the tools at the top (IconToolbarProperty): captioned rows of buttons with the icon over its text
+.propertyToolbar {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	padding: 0.5rem 0.6rem 0.6rem;
+	border: 1px solid var(--bs-border-color);
+	border-radius: var(--bs-border-radius);
+	background: color-mix(in srgb, var(--bs-primary) 5%, transparent);
+}
+.propertyToolbarCaption {
+	margin-top: 0.3rem;
+	font-size: 0.7rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--bs-primary);
+	&:first-child {
+		margin-top: 0;
+	}
+}
+.propertyToolbarButton {
+	flex: 1 1 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0;
+	padding: 0.2rem 0.1rem;
+	line-height: 1.15;
+	background: var(--bs-body-bg);
+	small {
+		font-size: 0.68rem;
+		white-space: nowrap;
+	}
+	&:hover {
+		background: var(--bs-secondary-bg);
+	}
+}
+
+// properties window: section headers
+
+.propertySectionHeader {
+	margin-top: 0.4rem;
+	padding: 0.3rem 0.5rem;
+	border-left: 4px solid var(--bs-primary);
+	border-radius: 0 var(--bs-border-radius) var(--bs-border-radius) 0;
+	background: color-mix(in srgb, var(--bs-primary) 12%, transparent);
+	.sectionChevron {
+		color: var(--bs-primary);
+	}
+}
+[data-bs-theme="dark"] .propertySectionHeader {
+	border-left-color: color-mix(in srgb, var(--bs-primary) 40%, white);
+	.sectionChevron {
+		color: color-mix(in srgb, var(--bs-primary) 40%, white);
+	}
+}
+[data-bs-theme="dark"] .propertyToolbarCaption {
+	color: color-mix(in srgb, var(--bs-primary) 40%, white);
+}

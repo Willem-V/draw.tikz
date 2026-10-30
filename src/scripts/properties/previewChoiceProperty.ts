@@ -32,7 +32,7 @@ export class PreviewChoiceProperty<T extends PreviewChoiceEntry> extends ChoiceP
 			button.type = "button"
 			button.classList.add(
 				"btn",
-				"btn-outline-primary",
+				"btn-outline-secondary",
 				"flex-grow-1",
 				"d-flex",
 				"flex-column",
