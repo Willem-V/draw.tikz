@@ -35,10 +35,11 @@ export function onHostMessage(handler: (message: FromHostMessage) => void) {
 
 /**
  * VS Code receives every key pressed in the webview and would also run its own shortcuts for them (e.g. Ctrl+E opens quick open).
- * Stop the shortcuts which the app handles itself. Ctrl+S is still passed on so VS Code saves the file.
+ * Stop the shortcuts which the app handles itself. Ctrl+S is still passed on so VS Code saves the file, and Ctrl+C/V/X so
+ * VS Code dispatches the copy/cut/paste events into the webview (the app handles these events, see CopyPaste).
  */
 export function keepShortcutsInWebview() {
-	const appKeys = new Set(["a", "c", "v", "x", "z", "y", "r", "e", "o"])
+	const appKeys = new Set(["a", "z", "y", "r", "e", "o"])
 	// registered after hotkeys-js, which also listens on the document, so the app shortcuts still work
 	document.addEventListener("keydown", (ev) => {
 		if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && appKeys.has(ev.key.toLowerCase())) {

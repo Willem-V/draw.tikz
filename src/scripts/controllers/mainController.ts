@@ -14,6 +14,7 @@ import {
 	SaveController,
 	Undo,
 	CopyPaste,
+	isTextInput,
 	PropertyController,
 	CircuitComponent,
 	ComponentPlacer,
@@ -586,8 +587,6 @@ export class MainController {
 				if (settingsModalEl.classList.contains("show")) {
 					settingsModalEl.dispatchEvent(new Event("show.bs.modal"))
 				}
-			} else if (msg.type == "clipboard") {
-				CopyPaste.setClipboard(msg.payload)
 			} else if (msg.type == "probe") {
 				// also respond with the orginal sender as the payload
 				this.sendBroadcastMessage("probe-response", msg.from)
@@ -851,19 +850,15 @@ export class MainController {
 		document.getElementById("undoButton").addEventListener("click", () => Undo.undo())
 		document.getElementById("redoButton").addEventListener("click", () => Undo.redo())
 
-		//copy/paste
-		hotkeys("ctrl+c,command+c", () => {
-			CopyPaste.copy()
-			return false
-		})
-		hotkeys("ctrl+v,command+v", () => {
-			CopyPaste.paste()
-			return false
-		})
-		hotkeys("ctrl+x,command+x", () => {
-			CopyPaste.cut()
-			return false
-		})
+		// copy/paste via the system clipboard (Ctrl/⌘ + C, V, X and the browser menu), see CopyPaste
+		const clipboardHandler = (handler: (ev: ClipboardEvent) => void) => (ev: ClipboardEvent) => {
+			if (!isTextInput(ev.target) && !isTextInput(document.activeElement)) {
+				handler(ev)
+			}
+		}
+		document.addEventListener("copy", clipboardHandler(CopyPaste.copy))
+		document.addEventListener("cut", clipboardHandler(CopyPaste.cut))
+		document.addEventListener("paste", clipboardHandler(CopyPaste.paste))
 
 		//save/load
 		hotkeys("ctrl+s,command+s", () => {

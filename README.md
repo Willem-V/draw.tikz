@@ -47,6 +47,7 @@ All controls of the editor are explained in the help menu (circled question mark
 - **SVG export for Office:** text inside symbols (e.g. T, Q and Q̄ on flip-flops) and labels no longer disappear when the exported SVG is used in PowerPoint or Word
 - **Grid switch** at startup now matches whether the grid is visible
 - **Fixed grid:** the grid is always 0.25cm (lines every 1cm), the grid size and subdivision settings are gone, so all drawings share one grid
+- **Copy/paste between windows:** copied components go to the system clipboard (as JSON text), so they can be pasted into another drawing in another browser tab or window, another VS Code editor, or between VS Code and the browser. The contents of a `.drawtikz.json` file can also be pasted into a drawing
 - No Google Analytics, no Electron desktop app
 
 ## Features
