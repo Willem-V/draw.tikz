@@ -104,3 +104,9 @@ Bugs that also occur in the original CircuiTi*k*Z-Designer can be reported [upst
 
 - **Reusable component groups:** save a selection as its own JSON file and import it into another drawing, both in VS Code and in the browser
 - **Import Ti*k*Z/JSON files:** add the contents of an existing JSON drawing or Ti*k*Z file to the current drawing. Ti*k*Z needs a conversion of the code to the JSON format
+- **Copy/paste between windows:** copy a selection in one drawing and paste it in another, also between VS Code editors and between VS Code and the browser (now the clipboard is only shared between browser tabs). Probably via the system clipboard
+- **Redesign the properties panel** (right side): the current panel is overwhelming and its controls are hard to use
+  - Grid first: sizes snap so that all terminals land on the grid (now it is hard to find a transistor size where they do), with off-grid adjustment as a secondary option when the situation needs it
+  - Replace the sliders with grid-step inputs and buttons
+  - Group the settings so the common ones come first and the rest stays out of the way
+  - Environment settings as plain choices instead of low-level CircuiTi*k*Z options, e.g. pick a transistor style from a few previews instead of "arrow at the end of the terminal"
