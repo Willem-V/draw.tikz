@@ -103,4 +103,3 @@ Bugs that also occur in the original CircuiTi*k*Z-Designer can be reported [upst
 
 ## Todos
 
-- **Reusable component groups:** save a selection as its own JSON file and import it into another drawing, both in VS Code and in the browser
