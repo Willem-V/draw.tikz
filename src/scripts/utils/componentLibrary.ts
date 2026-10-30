@@ -240,7 +240,7 @@ export function entryName(fileName: string): string {
  */
 function componentsToFile(components: CircuitComponent[]): string {
 	const bbox = components.map((component) => component.bbox).reduce((merged, bbox) => merged.merge(bbox))
-	const grid = gridSpacing()
+	const grid = CanvasController.gridSpacing
 	const offset = new SVG.Point(Math.round(bbox.cx / grid) * grid, Math.round(bbox.cy / grid) * grid)
 
 	// shift the components themselves, serialize them and shift them back
@@ -300,12 +300,6 @@ function previewSVG(components: CircuitComponent[]): string {
 	svg.viewbox(bbox.x - margin, bbox.y - margin, bbox.w + 2 * margin, bbox.h + 2 * margin)
 	svg.attr({ width: null, height: null })
 	return svg.svg()
-}
-
-/** the distance between two grid points in px */
-function gridSpacing(): number {
-	const canvas = CanvasController.instance
-	return new SVG.Number(canvas.majorGridSizecm / canvas.majorGridSubdivisions, "cm").convertToUnit("px").value
 }
 
 function loadFromStorage(): LibraryEntry[] {

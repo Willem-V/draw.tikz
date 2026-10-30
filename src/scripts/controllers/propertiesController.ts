@@ -13,6 +13,7 @@ import {
 	Undo,
 } from "../internal"
 import { ComponentLibrary } from "../utils/componentLibrary"
+import { HintBar } from "../utils/hintBar"
 
 export type FormEntry = {
 	originalObject: object
@@ -92,6 +93,7 @@ export class PropertyController {
 	update() {
 		let components = SelectionController.instance.currentlySelectedComponents
 		this.clearForm()
+		HintBar.updateSelection()
 
 		if (components.length > 1) {
 			this.setMultiForm(components)

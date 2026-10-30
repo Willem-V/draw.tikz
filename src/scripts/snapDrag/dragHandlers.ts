@@ -8,6 +8,7 @@ import {
 	SnapController,
 	Undo,
 } from "../internal"
+import { HintBar, transformHints } from "../utils/hintBar"
 
 export type DragCallbacks = {
 	dragStart?(pos: SVG.Point, ev?: MouseEvent | TouchEvent): void
@@ -50,6 +51,33 @@ export class SnapDragHandler {
 
 	private startedDragging = false
 	private didDrag = false
+
+	/** the handler of the component which is being dragged */
+	private static active: SnapDragHandler | null = null
+
+	/**
+	 * rotates or flips the selection during a drag. What is dragged is selected first, so it is what gets transformed.
+	 * @param transform changes the selection
+	 * @returns false if nothing is being dragged
+	 */
+	public static transformDragged(transform: () => void): boolean {
+		const handler = SnapDragHandler.active
+		if (!handler) {
+			return false
+		}
+		const dragged = handler.componentReference
+		const parent = getHighestParentGroup(dragged)
+		if (!parent.isSelected) {
+			SelectionController.instance.selectComponents([parent], SelectionMode.RESET)
+		}
+		const previousPosition = dragged.position.clone()
+		transform()
+		// keep the dragged component where it is relative to the cursor
+		handler.dragOffset = handler.dragOffset.add(dragged.position.sub(previousPosition))
+		handler.didDrag = true
+		SnapController.instance.updateSnapPoints(parent, false)
+		return true
+	}
 
 	constructor(componentReference: CircuitComponent, element: SVG.Element) {
 		this.componentReference = componentReference
@@ -103,6 +131,7 @@ export class SnapDragHandler {
 	private dragStart(ev: DragEvent) {
 		this.startedDragging = true
 		currentlyDragging = this.componentReference
+		SnapDragHandler.active = this
 		this.element.node.classList.add("dragging")
 		this.element.parent().node.classList.add("dragging")
 		this.dragOffset = this.componentReference.position.sub(CanvasController.eventToPoint(ev.detail.event, false))
@@ -110,6 +139,9 @@ export class SnapDragHandler {
 		SnapController.instance.updateSnapPoints(getHighestParentGroup(this.componentReference), false)
 	}
 	private dragMove(ev: DragEvent) {
+		if (!this.didDrag) {
+			HintBar.show("Moving", "", transformHints())
+		}
 		this.didDrag = true
 		ev.preventDefault()
 
@@ -137,6 +169,8 @@ export class SnapDragHandler {
 			return
 		}
 		currentlyDragging = null
+		SnapDragHandler.active = null
+		HintBar.clear()
 
 		let parent: CircuitComponent = getHighestParentGroup(this.componentReference)
 

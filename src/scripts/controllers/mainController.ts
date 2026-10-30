@@ -15,6 +15,7 @@ import {
 	SaveController,
 	ImportController,
 	ImportReportController,
+	SnapDragHandler,
 	Undo,
 	CopyPaste,
 	isTextInput,
@@ -797,15 +798,20 @@ export class MainController {
 		// stop reload behaviour
 		hotkeys("ctrl+r,command+r", () => false)
 
+		const transformSelection = (transform: () => void) => {
+			// while dragging, the undo state is added at the end of the drag
+			if (!SnapDragHandler.transformDragged(transform) && SelectionController.instance.hasSelection()) {
+				transform()
+				Undo.addState()
+			}
+		}
+
 		// rotate selection
 		hotkeys("ctrl+r,command+r", () => {
 			if (this.mode == Modes.COMPONENT) {
 				ComponentPlacer.instance.placeRotate(-90)
 			} else {
-				if (SelectionController.instance.hasSelection()) {
-					SelectionController.instance.rotateSelection(-90)
-					Undo.addState()
-				}
+				transformSelection(() => SelectionController.instance.rotateSelection(-90))
 			}
 			return false
 		})
@@ -813,10 +819,7 @@ export class MainController {
 			if (this.mode == Modes.COMPONENT) {
 				ComponentPlacer.instance.placeRotate(90)
 			} else {
-				if (SelectionController.instance.hasSelection()) {
-					SelectionController.instance.rotateSelection(90)
-					Undo.addState()
-				}
+				transformSelection(() => SelectionController.instance.rotateSelection(90))
 			}
 			return false
 		})
@@ -826,10 +829,7 @@ export class MainController {
 			if (this.mode == Modes.COMPONENT) {
 				ComponentPlacer.instance.placeFlip(true)
 			} else {
-				if (SelectionController.instance.hasSelection()) {
-					SelectionController.instance.flipSelection(true)
-					Undo.addState()
-				}
+				transformSelection(() => SelectionController.instance.flipSelection(true))
 			}
 			return false
 		})
@@ -837,10 +837,7 @@ export class MainController {
 			if (this.mode == Modes.COMPONENT) {
 				ComponentPlacer.instance.placeFlip(false)
 			} else {
-				if (SelectionController.instance.hasSelection()) {
-					SelectionController.instance.flipSelection(false)
-					Undo.addState()
-				}
+				transformSelection(() => SelectionController.instance.flipSelection(false))
 			}
 			return false
 		})

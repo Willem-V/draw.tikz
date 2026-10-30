@@ -1,4 +1,5 @@
 import hotkeys from "hotkeys-js"
+import { HintBar } from "./hintBar"
 
 /**
  * How a new wire segment goes from the previous point to the cursor, like the routing modes of EDA/PCB tools
@@ -43,7 +44,7 @@ export class WireModes {
 		WireModes.flipped = false
 		hotkeys("space", WireModes.nextMode)
 		hotkeys("/", WireModes.flipBend)
-		WireModes.updateIndicator()
+		WireModes.showHints()
 	}
 
 	public static stopPlacing() {
@@ -53,14 +54,14 @@ export class WireModes {
 		WireModes.onChange = null
 		hotkeys.unbind("space", WireModes.nextMode)
 		hotkeys.unbind("/", WireModes.flipBend)
-		WireModes.updateIndicator()
+		HintBar.clear()
 	}
 
 	private static nextMode(ev: KeyboardEvent) {
 		ev.preventDefault()
 		WireModes._mode = modeOrder[(modeOrder.indexOf(WireModes._mode) + 1) % modeOrder.length]
 		saveMode(WireModes._mode)
-		WireModes.updateIndicator()
+		WireModes.showHints()
 		WireModes.onChange?.()
 	}
 
@@ -70,16 +71,11 @@ export class WireModes {
 		WireModes.onChange?.()
 	}
 
-	private static updateIndicator() {
-		const indicator = document.getElementById("wireModeIndicator")
-		if (!indicator) {
-			return
-		}
-		indicator.classList.toggle("d-none", !WireModes.onChange)
-		const mode = indicator.querySelector(".wireModeName")
-		if (mode) {
-			mode.textContent = WireModes._mode
-		}
+	private static showHints() {
+		HintBar.show("Wire mode", WireModes._mode, [
+			{ key: "Space", action: "change mode" },
+			{ key: "/", action: "flip bend" },
+		])
 	}
 }
 

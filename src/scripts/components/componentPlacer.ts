@@ -4,6 +4,7 @@ import {
 	CircuitComponent,
 	MainController,
 	Modes,
+	NodeComponent,
 	PropertyController,
 	SelectionController,
 	SelectionMode,
@@ -12,6 +13,7 @@ import {
 	Undo,
 } from "../internal"
 import hotkeys from "hotkeys-js"
+import { HintBar, transformHints } from "../utils/hintBar"
 
 /**
  * used to place all components via user input
@@ -156,6 +158,7 @@ export class ComponentPlacer {
 		canvas.off("touchend", this.placeStep)
 		// canvas.off("dblclick",this.placeFinish)
 		hotkeys.unbind("enter", this.placeFinish)
+		HintBar.clear()
 	}
 
 	/**
@@ -176,6 +179,10 @@ export class ComponentPlacer {
 		canvas.on("mouseup", this.placeStep)
 		canvas.on("touchend", this.placeStep)
 		hotkeys("enter", { keyup: false, keydown: true }, this.placeFinish)
+		// wires and other paths cannot be rotated or flipped while placing
+		if (component instanceof NodeComponent) {
+			HintBar.show("Placing", "", transformHints())
+		}
 
 		// move once to actually place the component at the mouse position
 		this.component.placeMove(CanvasController.instance.lastCanvasPoint)
