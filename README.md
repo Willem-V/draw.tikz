@@ -46,6 +46,7 @@ All controls of the editor are explained in the help menu (circled question mark
 - **Symbol picker:** the symbol panel pops up in the middle of the screen (Q or I) and can be used with the keyboard like a picker in vim: type to search (fuzzy or regex), Enter places the highlighted symbol, Ctrl+J/K moves while typing, Tab switches to normal mode with h/j/k/l, gg/G and / (Tab goes back), Esc closes
 - **SVG export for Office:** text inside symbols (e.g. T, Q and Q̄ on flip-flops) and labels no longer disappear when the exported SVG is used in PowerPoint or Word
 - **Grid switch** at startup now matches whether the grid is visible
+- **Wire modes** like in EDA/PCB tools: while drawing a wire, Space switches between orthogonal (horizontal/vertical with one bend), 45° (a diagonal and a straight part) and free (any angle); / flips the bend to the other end of the segment. The mode is remembered
 - No Google Analytics, no Electron desktop app
 
 ## Features
