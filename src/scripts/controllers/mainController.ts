@@ -1,4 +1,5 @@
 import * as SVG from "@svgdotjs/svg.js"
+import { HintBar } from "../utils/hintBar"
 import { Button as _bootstrapButton, Collapse as _bootstrapCollapse, Offcanvas, Tooltip, Modal } from "bootstrap"
 import "../utils/impSVGNumber"
 import { waitForElementLoaded } from "../utils/domWatcher"
@@ -173,7 +174,6 @@ export class MainController {
 			}
 		})
 
-
 		this.updateTooltips()
 
 		// init exporting
@@ -248,6 +248,7 @@ export class MainController {
 			MainController.instance.updateTheme()
 			PropertyController.instance.update()
 			this.isInitDone = true
+			HintBar.updateSelection()
 		})
 	}
 
@@ -743,9 +744,11 @@ export class MainController {
 
 	private exportSVG() {
 		if (isVSCodeHost) {
-			ExportController.instance.getSVGString().then((content) =>
-				postToHost({ type: "export", format: "svg", content: content, path: this.hostExports?.svg })
-			)
+			ExportController.instance
+				.getSVGString()
+				.then((content) =>
+					postToHost({ type: "export", format: "svg", content: content, path: this.hostExports?.svg })
+				)
 		} else {
 			ExportController.instance.exportSVG()
 		}
@@ -1550,6 +1553,7 @@ export class MainController {
 			default:
 				break
 		}
+		HintBar.updateSelection()
 	}
 
 	public updateTheme() {

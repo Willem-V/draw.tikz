@@ -9,7 +9,8 @@ export type KeyHint = {
 
 /**
  * The bar at the bottom of the canvas which shows what is going on and which keys can be used right now.
- * Drawing wires, placing and moving show their own hints, otherwise the bar shows the hints for the selection.
+ * Drawing wires, placing and moving show their own hints, otherwise the bar shows the hints for the selection, or the
+ * main shortcuts if nothing is selected.
  */
 export class HintBar {
 	/** wires, placing or moving show their hints, the selection does not replace them */
@@ -34,7 +35,8 @@ export class HintBar {
 	}
 
 	/**
-	 * shows the keys for the selected components, call after the selection changed
+	 * shows the keys for the selected components (the main shortcuts without selection), call after the selection or the
+	 * mode changed
 	 */
 	public static updateSelection() {
 		if (HintBar.busy) {
@@ -43,6 +45,8 @@ export class HintBar {
 		const selected = SelectionController.instance.currentlySelectedComponents.length
 		if (selected > 0 && MainController.instance.mode == Modes.DRAG_PAN) {
 			HintBar.render(`${selected} selected`, "", transformHints())
+		} else if (MainController.instance.mode == Modes.DRAG_PAN) {
+			HintBar.render("Ready", "", idleHints())
 		} else {
 			document.getElementById("hintBar")?.classList.add("d-none")
 		}
@@ -78,5 +82,21 @@ export function transformHints(): KeyHint[] {
 		{ key: `${ctrl}+Shift+R`, action: "rotate ↺" },
 		{ key: "Shift+X", action: "flip at x-axis" },
 		{ key: "Shift+Y", action: "flip at y-axis" },
+	]
+}
+
+/**
+ * the main shortcuts, shown while nothing is selected or going on
+ */
+function idleHints(): KeyHint[] {
+	const ctrl = MainController.instance.isMac ? "⌘" : "Ctrl"
+	return [
+		{ key: "I", action: "add component" },
+		{ key: "W", action: "wire" },
+		{ key: "R", action: "resistor" },
+		{ key: "C", action: "capacitor" },
+		{ key: "L", action: "inductor" },
+		{ key: "G", action: "ground" },
+		{ key: `${ctrl}+O`, action: "open" },
 	]
 }
