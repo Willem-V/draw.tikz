@@ -311,19 +311,79 @@ async function newDrawing(folder?: vscode.Uri) {
 		vscode.window.showErrorMessage("draw.tikz: open a folder first")
 		return
 	}
-	const name = await vscode.window.showInputBox({
+	const input = await vscode.window.showInputBox({
 		title: "New draw.tikz drawing",
-		prompt: `Name of the drawing (creates <name>${fileSuffix} in ${vscode.workspace.asRelativePath(folder)})`,
-		validateInput: (value) => (/^[^\\/:*?"<>|]+$/.test(value.trim()) ? undefined : "Enter a valid file name"),
+		prompt: `Name or relative path of the drawing, e.g. figures/circuit (creates <name>${fileSuffix} in ${vscode.workspace.asRelativePath(folder)})`,
+		validateInput: (value) => validateDrawingPath(value),
 	})
-	if (!name) {
+	if (!input) {
 		return
 	}
-	const file = vscode.Uri.joinPath(folder, name.trim().replace(/\.drawtikz\.json$/i, "") + fileSuffix)
+	const segments = splitDrawingPath(input)
+	const fileName = (segments.pop() ?? "").replace(/\.drawtikz\.json$/i, "") + fileSuffix
+
+	// subfolders that don't exist yet are only created after confirmation, as the path might contain a typo
+	let target = folder
+	const missing: string[] = []
+	for (const segment of segments) {
+		target = vscode.Uri.joinPath(target, segment)
+		if (missing.length == 0) {
+			try {
+				const stat = await vscode.workspace.fs.stat(target)
+				if (stat.type != vscode.FileType.Directory) {
+					vscode.window.showErrorMessage(`draw.tikz: "${segment}" exists but is not a folder`)
+					return
+				}
+				continue
+			} catch {}
+		}
+		missing.push(segment)
+	}
+	if (missing.length > 0) {
+		const choice = await vscode.window.showWarningMessage(
+			`The folder "${segments.join("/")}" does not exist yet. Create it (and ${fileName})?`,
+			{ modal: true, detail: "Choose Cancel if the path contains a typo." },
+			"Create folder"
+		)
+		if (choice !== "Create folder") {
+			return
+		}
+		await vscode.workspace.fs.createDirectory(target) // creates missing parents too, like mkdir -p
+	}
+
+	const file = vscode.Uri.joinPath(target, fileName)
 	try {
 		await vscode.workspace.fs.stat(file)
 	} catch {
 		await vscode.workspace.fs.writeFile(file, new Uint8Array())
 	}
 	await vscode.commands.executeCommand("vscode.openWith", file, "drawtikz.editor")
+}
+
+/** the folders and the file name of a path entered for a new drawing (both / and \\ separate folders) */
+function splitDrawingPath(value: string): string[] {
+	return value
+		.trim()
+		.split(/[\\/]+/)
+		.filter((segment) => segment.length > 0)
+}
+
+/** an error message if the path is not a valid relative path inside the folder, otherwise undefined */
+function validateDrawingPath(value: string): string | undefined {
+	const trimmed = value.trim()
+	if (!trimmed || /[\\/]$/.test(trimmed)) {
+		return "Enter a file name"
+	}
+	if (/^([\\/]|[a-zA-Z]:)/.test(trimmed)) {
+		return "Enter a path relative to the folder"
+	}
+	for (const segment of splitDrawingPath(trimmed)) {
+		if (segment == "." || segment == "..") {
+			return "'.' and '..' are not allowed in the path"
+		}
+		if (/[:*?"<>|]/.test(segment)) {
+			return "The path contains invalid characters"
+		}
+	}
+	return undefined
 }
