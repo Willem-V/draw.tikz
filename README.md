@@ -117,3 +117,4 @@ Bugs that also occur in the original CircuiTi*k*Z-Designer can be reported [upst
 - [ ] Copy/pasting text components doesn't work: weird text appears that looks like internal LaTeX code.
 - [ ] Editing text is awkward.
 - [x] Adding a new drawing by entering a path doesn't work. Paths should be parsed so drawings can be created in subfolders. Create missing subfolders (`mkdir -p`), but ask for confirmation first in case of a typo.
+- [ ] When adding components, update them when the file they come from changes.
