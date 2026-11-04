@@ -15,9 +15,7 @@ type FromAppMessage =
 	| { type: "export"; format: ExportFormat; content: string; path?: string }
 	| { type: "saveComponent"; content: string }
 	| { type: "pickComponent" }
-
-/** a reusable component for the app, see src/scripts/utils/componentLibrary.ts */
-type LibraryEntry = { name: string; text: string }
+	| { type: "requestComponent"; path: string }
 
 const fileSuffix = ".drawtikz.json"
 
@@ -54,10 +52,11 @@ class DrawTikzEditorProvider implements vscode.CustomTextEditorProvider {
 		})
 		panel.onDidDispose(() => changeListener.dispose())
 
-		const library = new ComponentFolderWatcher(document, (components) =>
-			panel.webview.postMessage({ type: "library", components: components })
+		// the component files which the drawing links to, watched so the instances update when a file changes
+		const components = new ComponentFiles(document, (path, text) =>
+			panel.webview.postMessage({ type: "componentFile", path: path, text: text })
 		)
-		panel.onDidDispose(() => library.dispose())
+		panel.onDidDispose(() => components.dispose())
 
 		const exportAndRemember = async (format: ExportFormat, content: string, storedPath?: string) => {
 			const relativePath = await exportDrawing(document, format, content, storedPath)
@@ -77,7 +76,6 @@ class DrawTikzEditorProvider implements vscode.CustomTextEditorProvider {
 			switch (message.type) {
 				case "ready":
 					sendLoad()
-					library.send()
 					break
 				case "edit":
 					appText = message.text
@@ -90,13 +88,29 @@ class DrawTikzEditorProvider implements vscode.CustomTextEditorProvider {
 				case "export":
 					exportAndRemember(message.format, message.content, message.path)
 					break
-				case "saveComponent":
-					saveComponent(document, message.content)
+				case "requestComponent":
+					components.request(message.path)
 					break
+				case "saveComponent": {
+					const saved = await saveComponent(document, message.content)
+					if (saved) {
+						const choice = await vscode.window.showInformationMessage(
+							`draw.tikz: saved ${saved}`,
+							"Place it in this drawing"
+						)
+						if (choice) {
+							await components.request(saved)
+							panel.webview.postMessage({ type: "placeComponent", path: saved })
+						}
+					}
+					break
+				}
 				case "pickComponent": {
-					const component = await pickComponent(document)
-					if (component) {
-						panel.webview.postMessage({ type: "placeComponent", component: component })
+					const picked = await pickComponent(document)
+					if (picked) {
+						// the app needs the content of the file before it places the component
+						await components.request(picked)
+						panel.webview.postMessage({ type: "placeComponent", path: picked })
 					}
 					break
 				}
@@ -148,11 +162,16 @@ async function exportDrawing(
 		target = vscode.Uri.joinPath(drawingFolder, storedPath)
 	} else {
 		const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri)?.uri ?? drawingFolder
-		const exportFolder = vscode.workspace.getConfiguration("drawtikz").get<string>("defaultExportFolder") || "."
+		// without the setting the export is suggested next to the drawing
+		const exportFolder = vscode.workspace.getConfiguration("drawtikz").get<string>("defaultExportFolder") || ""
 		const name = path.posix.basename(document.uri.path).replace(/\.drawtikz\.json$/i, "")
 		target = await vscode.window.showSaveDialog({
 			title: `Export ${format == "tikz" ? "CircuiTikZ code" : "SVG"}`,
-			defaultUri: vscode.Uri.joinPath(workspaceFolder, exportFolder, name + "." + format),
+			defaultUri: vscode.Uri.joinPath(
+				exportFolder ? workspaceFolder : drawingFolder,
+				exportFolder,
+				name + "." + format
+			),
 			filters: format == "tikz" ? { TikZ: ["tikz", "tex", "pgf"] } : { SVG: ["svg"] },
 		})
 		if (!target) {
@@ -165,85 +184,106 @@ async function exportDrawing(
 }
 
 /**
- * Sends the reusable components (the *.drawtikz.json files in the component folder of the workspace) to the app of one
- * editor, again after every change of these files or of the setting drawtikz.componentFolder.
+ * The component files which the drawing links to (instances in the app). A file is identified by its path relative to the
+ * workspace folder, any folder and file name works. The files are read when the app asks for them and sent again after
+ * every change, so the instances in the app update.
  */
-class ComponentFolderWatcher {
-	private watcher: vscode.FileSystemWatcher | undefined
-	private configListener: vscode.Disposable
-	private sendTimeout: ReturnType<typeof setTimeout> | undefined
+class ComponentFiles {
+	private watchers = new Map<string, vscode.Disposable>()
+	private timeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
 	constructor(
 		private readonly document: vscode.TextDocument,
-		private readonly post: (components: LibraryEntry[]) => void
-	) {
-		this.watch()
-		this.configListener = vscode.workspace.onDidChangeConfiguration((ev) => {
-			if (ev.affectsConfiguration("drawtikz.componentFolder")) {
-				this.watch()
-				this.send()
-			}
-		})
+		private readonly post: (path: string, text: string | null) => void
+	) {}
+
+	/** reads the file, sends its content to the app and keeps sending it when it changes */
+	async request(relativePath: string) {
+		const file = componentUri(this.document, relativePath)
+		if (!file) {
+			this.post(relativePath, null)
+			vscode.window.showWarningMessage(
+				`draw.tikz: the component path "${relativePath}" must be relative and inside the workspace folder`
+			)
+			return
+		}
+		await this.send(relativePath, file)
+		if (!this.watchers.has(relativePath)) {
+			const watcher = vscode.workspace.createFileSystemWatcher(
+				new vscode.RelativePattern(workspaceFolderOf(this.document), escapeGlob(relativePath))
+			)
+			const changed = () => this.sendSoon(relativePath, file)
+			this.watchers.set(
+				relativePath,
+				vscode.Disposable.from(
+					watcher,
+					watcher.onDidCreate(changed),
+					watcher.onDidChange(changed),
+					watcher.onDidDelete(changed)
+				)
+			)
+		}
 	}
 
-	/** the glob of the component files, relative to the workspace folder of the drawing */
-	private pattern(): vscode.RelativePattern {
-		const folder = componentFolder(this.document)
-			.replace(/\\/g, "/")
-			.replace(/^\.?\/+|\/+$/g, "")
-		return new vscode.RelativePattern(
-			workspaceFolderOf(this.document),
-			(folder ? folder + "/" : "") + "**/*" + fileSuffix
+	/** a save often changes the file several times, send it once afterwards */
+	private sendSoon(relativePath: string, file: vscode.Uri) {
+		clearTimeout(this.timeouts.get(relativePath))
+		this.timeouts.set(
+			relativePath,
+			setTimeout(() => this.send(relativePath, file), 150)
 		)
 	}
 
-	private watch() {
-		this.watcher?.dispose()
-		this.watcher = vscode.workspace.createFileSystemWatcher(this.pattern())
-		const changed = () => this.sendSoon()
-		this.watcher.onDidCreate(changed)
-		this.watcher.onDidChange(changed)
-		this.watcher.onDidDelete(changed)
-	}
-
-	/** several files can change at once (e.g. git checkout), send the list once afterwards */
-	private sendSoon() {
-		clearTimeout(this.sendTimeout)
-		this.sendTimeout = setTimeout(() => this.send(), 300)
-	}
-
-	async send() {
-		const files = await vscode.workspace.findFiles(this.pattern())
-		const components: LibraryEntry[] = []
-		for (const file of files) {
-			try {
-				components.push({ name: componentName(file), text: await readText(file) })
-			} catch (e) {
-				console.warn(`draw.tikz: could not read the component ${file.fsPath}`, e)
-			}
+	private async send(relativePath: string, file: vscode.Uri) {
+		try {
+			this.post(relativePath, await readText(file))
+		} catch {
+			// the file does not exist (anymore)
+			this.post(relativePath, null)
 		}
-		this.post(components)
 	}
 
 	dispose() {
-		clearTimeout(this.sendTimeout)
-		this.watcher?.dispose()
-		this.configListener.dispose()
+		this.timeouts.forEach((timeout) => clearTimeout(timeout))
+		this.watchers.forEach((watcher) => watcher.dispose())
 	}
 }
 
 /**
- * writes a component file, by default into the component folder so it appears in the symbol picker
+ * the file of a component path (relative to the workspace folder, with / or \\), undefined if the path is not inside the workspace folder
  */
-async function saveComponent(document: vscode.TextDocument, content: string) {
-	const folder = vscode.Uri.joinPath(workspaceFolderOf(document), componentFolder(document))
+function componentUri(document: vscode.TextDocument, relativePath: string): vscode.Uri | undefined {
+	const normalized = path.posix.normalize(relativePath.trim().replace(/\\/g, "/"))
+	if (
+		!normalized ||
+		normalized == "." ||
+		normalized.startsWith("/") ||
+		/^[a-zA-Z]:/.test(normalized) ||
+		/(^|\/)\.\.(\/|$)/.test(normalized)
+	) {
+		return undefined
+	}
+	return vscode.Uri.joinPath(workspaceFolderOf(document), normalized)
+}
+
+/** a path as a glob pattern which only matches this path */
+function escapeGlob(relativePath: string): string {
+	return path.posix.normalize(relativePath.trim().replace(/\\/g, "/")).replace(/[*?[\]{}()!]/g, (c) => `[${c}]`)
+}
+
+/**
+ * writes a component file to a place chosen in a save dialog (any folder in the workspace works)
+ * @returns the path of the file relative to the workspace folder, undefined if cancelled or outside of the workspace folder
+ */
+async function saveComponent(document: vscode.TextDocument, content: string): Promise<string | undefined> {
+	const workspaceFolder = workspaceFolderOf(document)
 	const target = await vscode.window.showSaveDialog({
 		title: "Save as reusable component",
-		defaultUri: vscode.Uri.joinPath(folder, "component" + fileSuffix),
+		defaultUri: vscode.Uri.joinPath(vscode.Uri.joinPath(document.uri, ".."), "component" + fileSuffix),
 		filters: { "draw.tikz component": ["json"] },
 	})
 	if (!target) {
-		return
+		return undefined
 	}
 	// the save dialog only appends .json
 	const file =
@@ -251,40 +291,84 @@ async function saveComponent(document: vscode.TextDocument, content: string) {
 			target.with({ path: target.path.replace(/(\.json)?$/i, fileSuffix) })
 		)
 	await vscode.workspace.fs.writeFile(file, new TextEncoder().encode(content))
-	if (!file.path.startsWith(folder.path + "/")) {
-		vscode.window.showInformationMessage(
-			`draw.tikz: saved ${vscode.workspace.asRelativePath(file)}. Only components in the folder ` +
-				`"${componentFolder(document)}" (setting drawtikz.componentFolder) are listed in the symbol picker.`
+	const relative = path.posix.relative(workspaceFolder.path, file.path)
+	if (relative.startsWith("..")) {
+		vscode.window.showWarningMessage(
+			`draw.tikz: saved ${file.fsPath}, but components can only be placed from inside the workspace folder`
 		)
+		return undefined
 	}
+	return relative
 }
 
 /**
- * asks for a component file or any drawing to place into the drawing
+ * asks for a component file or any drawing to place into the drawing: type a path relative to the workspace folder, pick
+ * one of the drawings in the workspace or browse for a file
+ * @returns the path relative to the workspace folder
  */
-async function pickComponent(document: vscode.TextDocument): Promise<LibraryEntry | undefined> {
+async function pickComponent(document: vscode.TextDocument): Promise<string | undefined> {
+	const workspaceFolder = workspaceFolderOf(document)
+	const own = path.posix.relative(workspaceFolder.path, document.uri.path)
+	const found = await vscode.workspace.findFiles(
+		new vscode.RelativePattern(workspaceFolder, "**/*" + fileSuffix),
+		"**/node_modules/**",
+		500
+	)
+	const drawings = found
+		.map((file) => path.posix.relative(workspaceFolder.path, file.path))
+		.filter((relative) => relative != own)
+		.sort()
+
+	const browseLabel = "$(folder-opened) Browse for a file..."
+	const quickPick = vscode.window.createQuickPick()
+	quickPick.title = "Place a component or drawing"
+	quickPick.placeholder = "Type a path relative to the workspace folder, or choose a drawing"
+	const refresh = () => {
+		const typed = quickPick.value.trim()
+		const items: vscode.QuickPickItem[] = [{ label: browseLabel }]
+		if (typed && !drawings.includes(typed)) {
+			items.push({ label: typed, description: "use this path", alwaysShow: true })
+		}
+		items.push(...drawings.map((label) => ({ label })))
+		quickPick.items = items
+	}
+	refresh()
+	quickPick.onDidChangeValue(refresh)
+
+	const choice = await new Promise<string | undefined>((resolve) => {
+		quickPick.onDidAccept(() => {
+			resolve(quickPick.selectedItems[0]?.label ?? quickPick.value.trim())
+			quickPick.hide()
+		})
+		quickPick.onDidHide(() => resolve(undefined))
+		quickPick.show()
+	})
+	quickPick.dispose()
+	if (!choice) {
+		return undefined
+	}
+	if (choice != browseLabel) {
+		return choice
+	}
 	const files = await vscode.window.showOpenDialog({
 		title: "Place a component or drawing",
-		defaultUri: vscode.Uri.joinPath(workspaceFolderOf(document), componentFolder(document)),
+		defaultUri: workspaceFolder,
 		filters: { "draw.tikz drawing": ["json"] },
 		canSelectMany: false,
 	})
 	if (!files?.length) {
 		return undefined
 	}
-	return { name: componentName(files[0]), text: await readText(files[0]) }
-}
-
-function componentFolder(document: vscode.TextDocument): string {
-	return vscode.workspace.getConfiguration("drawtikz", document.uri).get<string>("componentFolder") || "components"
+	const relative = path.posix.relative(workspaceFolder.path, files[0].path)
+	if (relative.startsWith("..")) {
+		vscode.window.showWarningMessage("draw.tikz: components can only be placed from inside the workspace folder")
+		return undefined
+	}
+	return relative
 }
 
 function workspaceFolderOf(document: vscode.TextDocument): vscode.Uri {
 	return vscode.workspace.getWorkspaceFolder(document.uri)?.uri ?? vscode.Uri.joinPath(document.uri, "..")
-}
-
-function componentName(file: vscode.Uri): string {
-	return path.posix.basename(file.path).replace(/\.drawtikz\.json$|\.json$/i, "")
 }
 
 async function readText(file: vscode.Uri): Promise<string> {
@@ -303,27 +387,85 @@ async function newDrawing(folder?: vscode.Uri) {
 	} else {
 		const active = vscode.window.activeTextEditor?.document.uri
 		folder =
-			active?.scheme == "file" ?
-				vscode.Uri.joinPath(active, "..")
-			:	vscode.workspace.workspaceFolders?.[0]?.uri
+			active?.scheme == "file" ? vscode.Uri.joinPath(active, "..") : vscode.workspace.workspaceFolders?.[0]?.uri
 	}
 	if (!folder) {
 		vscode.window.showErrorMessage("draw.tikz: open a folder first")
 		return
 	}
-	const name = await vscode.window.showInputBox({
+	const input = await vscode.window.showInputBox({
 		title: "New draw.tikz drawing",
-		prompt: `Name of the drawing (creates <name>${fileSuffix} in ${vscode.workspace.asRelativePath(folder)})`,
-		validateInput: (value) => (/^[^\\/:*?"<>|]+$/.test(value.trim()) ? undefined : "Enter a valid file name"),
+		prompt: `Name or relative path of the drawing, e.g. figures/circuit (creates <name>${fileSuffix} in ${vscode.workspace.asRelativePath(folder)})`,
+		validateInput: (value) => validateDrawingPath(value),
 	})
-	if (!name) {
+	if (!input) {
 		return
 	}
-	const file = vscode.Uri.joinPath(folder, name.trim().replace(/\.drawtikz\.json$/i, "") + fileSuffix)
+	const segments = splitDrawingPath(input)
+	const fileName = (segments.pop() ?? "").replace(/\.drawtikz\.json$/i, "") + fileSuffix
+
+	// subfolders that don't exist yet are only created after confirmation, as the path might contain a typo
+	let target = folder
+	const missing: string[] = []
+	for (const segment of segments) {
+		target = vscode.Uri.joinPath(target, segment)
+		if (missing.length == 0) {
+			try {
+				const stat = await vscode.workspace.fs.stat(target)
+				if (stat.type != vscode.FileType.Directory) {
+					vscode.window.showErrorMessage(`draw.tikz: "${segment}" exists but is not a folder`)
+					return
+				}
+				continue
+			} catch {}
+		}
+		missing.push(segment)
+	}
+	if (missing.length > 0) {
+		const choice = await vscode.window.showWarningMessage(
+			`The folder "${segments.join("/")}" does not exist yet. Create it (and ${fileName})?`,
+			{ modal: true, detail: "Choose Cancel if the path contains a typo." },
+			"Create folder"
+		)
+		if (choice !== "Create folder") {
+			return
+		}
+		await vscode.workspace.fs.createDirectory(target) // creates missing parents too, like mkdir -p
+	}
+
+	const file = vscode.Uri.joinPath(target, fileName)
 	try {
 		await vscode.workspace.fs.stat(file)
 	} catch {
 		await vscode.workspace.fs.writeFile(file, new Uint8Array())
 	}
 	await vscode.commands.executeCommand("vscode.openWith", file, "drawtikz.editor")
+}
+
+/** the folders and the file name of a path entered for a new drawing (both / and \\ separate folders) */
+function splitDrawingPath(value: string): string[] {
+	return value
+		.trim()
+		.split(/[\\/]+/)
+		.filter((segment) => segment.length > 0)
+}
+
+/** an error message if the path is not a valid relative path inside the folder, otherwise undefined */
+function validateDrawingPath(value: string): string | undefined {
+	const trimmed = value.trim()
+	if (!trimmed || /[\\/]$/.test(trimmed)) {
+		return "Enter a file name"
+	}
+	if (/^([\\/]|[a-zA-Z]:)/.test(trimmed)) {
+		return "Enter a path relative to the folder"
+	}
+	for (const segment of splitDrawingPath(trimmed)) {
+		if (segment == "." || segment == "..") {
+			return "'.' and '..' are not allowed in the path"
+		}
+		if (/[:*?"<>|]/.test(segment)) {
+			return "The path contains invalid characters"
+		}
+	}
+	return undefined
 }

@@ -27,7 +27,7 @@ The extension opens `*.drawtikz.json` files in the draw.tikz editor inside VS Co
 
 Saving and undo/redo go through VS Code like for any other file. Exporting to Ti*k*Z or SVG writes the file into the workspace: the first export of a drawing suggests the folder from the setting `drawtikz.defaultExportFolder` (default `fig`), later exports overwrite the same file.
 
-Reusable components ("Save as component", see below) are saved into the folder from the setting `drawtikz.componentFolder` (default `components`). All drawings in that folder are listed under "My components" in the symbol picker and update when the files change.
+Reusable components ("Save as component", see below) can be saved anywhere in the workspace. A component is identified by its path relative to the workspace folder, and instances of it update when the file changes.
 
 All controls of the editor are explained in the help menu (circled question mark in the top right corner).
 
@@ -50,7 +50,11 @@ All controls of the editor are explained in the help menu (circled question mark
 - **Grid switch** at startup now matches whether the grid is visible
 - **Import Ti*k*Z and JSON** (Ctrl/⌘ + O, or Ctrl/⌘ + Shift + O to paste code): load a file or pasted code and replace the drawing or add it to the current one, with a report of everything that could not be converted. Based on the importer that was briefly in CircuiTi*k*Z-Designer, extended with anchors (`(M1.drain)`, `(ic.pin 3)`, `anchor=D`), shifted coordinates, rotation/mirroring, labels, rectangles/ellipses/circles with their line and fill style, and the text of rectangles, so the Ti*k*Z export of this app imports again without changes. Run the importer tests with `npm run test:import`
 - **Wire modes** like in EDA/PCB tools: while drawing a wire, Space switches between orthogonal (horizontal/vertical with one bend), 45° (a diagonal and a straight part) and free (any angle); / flips the bend to the other end of the segment. The mode is remembered
-- **Reusable components:** select a part of a drawing and click "Save as component" (properties panel, also on a group) to save it as its own `.drawtikz.json` file. It shows up under "My components" in the symbol picker and is placed like a symbol: it follows the cursor, snaps to the grid, can be rotated and flipped, and a click places it as a group. "Import file..." in the same group places any drawing. In the browser the components are kept in the browser storage; in VS Code they are the files in the component folder of the workspace
+- **Reusable components:** select a part of a drawing and click "Save as component" (properties panel, also on a group) to save it as its own `.drawtikz.json` file. It is placed like a symbol: it follows the cursor, snaps to the grid, can be rotated and flipped. The placed component is a linked instance (real hierarchy): the drawing only stores the path of the file, so the instance updates when the file changes, and the export contains its expanded components. "Make independent copy" turns an instance into normal components. In VS Code "From file or path..." in the "My components" group of the symbol picker places any drawing or component: type a path relative to the workspace folder (any folder and file name works) or browse for a file. In the browser the components are kept in the browser storage (the path is the name of the entry)
+- **Mux and block sizes in grid steps:** the width and heights of the block with pins and the mux are shown and typed in grid steps. With "Snap size to grid" the − / + buttons jump to the next size at which all pins are on the grid, and the resize handles follow the pointer without a second snap to the canvas grid
+- **Text on the canvas:** double-click a text component (or press Enter / F2 with it selected) to edit its text directly on the canvas. Ctrl/⌘ + Enter or Esc finishes, the key hints at the bottom show it. The text field in the properties panel is bigger and Esc leaves it
+- **Text like LaTeX draws it:** the text in flip-flops, latches, logic ports, op amps and similar symbols stays upright when the symbol is rotated and is flipped vertically when it is mirrored, as in the exported CircuiTi*k*Z, so the preview matches the PDF
+- **New drawings in subfolders:** "New drawing" accepts a relative path like `figures/amplifier`; missing folders are created after a confirmation (in case of a typo)
 - **Key hints:** a bar at the bottom of the canvas shows the rotate and flip shortcuts while components are selected, placed or dragged, and they now also work during a drag
 - **Properties panel redesign:**
   - **Grid first:** symbols get a "Size on grid" with − / + buttons that step through the sizes at which their main terminals are on the grid (slightly different x and y scales, e.g. 1.02 × 0.97 for a transistor). Helper and supply pins like `up` and `down` of an op amp stay off the grid. New symbols start at the grid size closest to their normal size if that is within about 15%; the free scale is still there for other sizes
@@ -113,4 +117,3 @@ Report bugs and request features in the [GitHub issues](https://github.com/Wille
 Bugs that also occur in the original CircuiTi*k*Z-Designer can be reported [upstream](https://github.com/Circuit2TikZ/CircuiTikZ-Designer/issues).
 
 ## Todos
-

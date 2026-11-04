@@ -17,6 +17,8 @@ export class TextAreaProperty extends EditableProperty<string> {
 			this.input.classList.add("form-control")
 			this.input.value = this.value ?? ""
 			this.input.placeholder = "text component"
+			this.input.rows = 5
+			this.input.style.resize = "vertical"
 			inputDiv.appendChild(this.input)
 		}
 		rowTextArea.appendChild(inputDiv)
@@ -34,11 +36,27 @@ export class TextAreaProperty extends EditableProperty<string> {
 				Undo.addState()
 			}
 		})
+		this.input.addEventListener("keydown", (ev) => {
+			// Escape leaves the text field, so the shortcuts of the canvas work again
+			if (ev.key == "Escape") {
+				this.input.blur()
+			}
+		})
 		this.input.addEventListener("mousedown", (ev) => {
 			CanvasController.instance.draggingFromInput = this.input
 		})
 
 		return rowTextArea
+	}
+
+	/**
+	 * puts the cursor into the text field and selects the text, so it can be typed over
+	 */
+	public focus() {
+		if (this.input && !this.input.disabled) {
+			this.input.focus()
+			this.input.select()
+		}
 	}
 
 	protected disable(disabled = true): void {

@@ -6,7 +6,7 @@ import {
 	ComponentSaveObject,
 	EnvironmentVariableController,
 	ExportController,
-	GroupComponent,
+	InstanceComponent,
 	MainController,
 	Modes,
 	SaveFileFormat,
@@ -15,18 +15,26 @@ import {
 import { isVSCodeHost, postToHost } from "./host"
 
 /**
- * Reusable components: a selection saved as its own *.drawtikz.json file, which can be placed into any drawing from the
- * "My components" group of the symbol picker.
+ * Reusable components: a selection saved as its own *.drawtikz.json file, which is placed into drawings as a linked
+ * instance (see InstanceComponent): the drawing only stores the path of the file, so the instances update when the file
+ * changes.
  *
- * Where the files come from depends on the host: in VS Code the extension sends the files in the component folder of the
- * workspace (setting drawtikz.componentFolder), in the browser the files are kept in the localStorage.
+ * A component is identified by its path. In VS Code that is the path of the file relative to the workspace folder (any
+ * folder, any file name), which the extension reads and watches. In the browser the files are kept in the localStorage and
+ * the path is the name of the entry.
  */
 
 export type LibraryEntry = {
-	/** the file name without .drawtikz.json */
+	/** the path of the file relative to the workspace folder (VS Code) or the name of the entry (browser) */
 	name: string
 	/** the content of the file (SaveFileFormat) */
 	text: string
+}
+
+/** something which shows the content of a component file and has to reload when it changes */
+export interface ComponentUser {
+	source: string
+	reload(): void
 }
 
 const fileSuffix = ".drawtikz.json"
@@ -38,9 +46,17 @@ export class ComponentLibrary {
 		return ComponentLibrary._instance ?? (ComponentLibrary._instance = new ComponentLibrary())
 	}
 
-	private _entries: LibraryEntry[] = []
-	public get entries(): readonly LibraryEntry[] {
-		return this._entries
+	/** browser: the entries in the storage. VS Code: the files sent by the extension, null for files which don't exist */
+	private files = new Map<string, string | null>()
+	private requested = new Set<string>()
+	private users = new Set<ComponentUser>()
+
+	/** the known components: in the browser all entries of the library, in VS Code the files used in this drawing */
+	public get entries(): LibraryEntry[] {
+		return [...this.files.entries()]
+			.filter(([, text]) => text !== null)
+			.map(([name, text]) => ({ name: name, text: text as string }))
+			.sort((a, b) => a.name.localeCompare(b.name))
 	}
 
 	/** called after every change of the entries, e.g. to rebuild the picker group */
@@ -48,32 +64,75 @@ export class ComponentLibrary {
 
 	private constructor() {
 		if (!isVSCodeHost) {
-			this._entries = loadFromStorage()
+			for (const entry of loadFromStorage()) {
+				this.files.set(entry.name, entry.text)
+			}
 		}
 	}
 
 	/**
-	 * replaces all entries (VS Code: the files of the component folder)
+	 * the content of a component file. In VS Code the file is requested from the extension if it is not known yet, the
+	 * users are reloaded when it arrives.
+	 * @returns undefined if the file is not (yet) available
 	 */
-	public setEntries(entries: LibraryEntry[]) {
-		this._entries = [...entries].sort((a, b) => a.name.localeCompare(b.name))
+	public getText(path: string): string | undefined {
+		const text = this.files.get(path)
+		if (text === undefined && isVSCodeHost && !this.requested.has(path)) {
+			this.requested.add(path)
+			postToHost({ type: "requestComponent", path: path })
+		}
+		return text ?? undefined
+	}
+
+	/**
+	 * the content of a component file changed (VS Code: sent by the extension, null if the file doesn't exist)
+	 */
+	public setFile(path: string, text: string | null) {
+		this.requested.add(path)
+		if (this.files.get(path) === text) {
+			return
+		}
+		this.files.set(path, text)
+		this.fileChanged(path)
+	}
+
+	private fileChanged(path: string) {
+		for (const user of [...this.users]) {
+			if (user.source == path) {
+				user.reload()
+			}
+		}
 		this.onChange()
+	}
+
+	/** if the content of the file is known */
+	public isLoaded(path: string): boolean {
+		return typeof this.files.get(path) == "string"
+	}
+
+	public addUser(user: ComponentUser) {
+		this.users.add(user)
+	}
+	public removeUser(user: ComponentUser) {
+		this.users.delete(user)
 	}
 
 	/**
 	 * adds an entry or replaces the one with the same name (browser only, VS Code reads the files from the workspace)
 	 */
 	public add(entry: LibraryEntry) {
-		this.setEntries([...this._entries.filter((existing) => existing.name != entry.name), entry])
-		saveToStorage(this._entries)
+		this.files.set(entry.name, entry.text)
+		saveToStorage(this.entries)
+		this.fileChanged(entry.name)
 	}
 
 	/**
-	 * removes an entry (browser only, in VS Code the file is deleted instead)
+	 * removes an entry (browser only, in VS Code the file is deleted instead). Instances in drawings show a placeholder.
 	 */
 	public remove(name: string) {
-		this.setEntries(this._entries.filter((entry) => entry.name != name))
-		saveToStorage(this._entries)
+		this.files.delete(name)
+		saveToStorage(this.entries)
+		this.fileChanged(name)
 	}
 
 	/**
@@ -98,8 +157,9 @@ export class ComponentLibrary {
 	}
 
 	/**
-	 * lets the user choose a file (a component or any drawing) and places its components.
-	 * In the browser the file is also added to the library.
+	 * VS Code: lets the user choose a component file or enter its path. Browser: lets the user choose a file (a component or
+	 * any drawing), which is added to the library.
+	 * The component is placed afterwards.
 	 */
 	public importFile() {
 		if (isVSCodeHost) {
@@ -116,31 +176,20 @@ export class ComponentLibrary {
 			}
 			const entry: LibraryEntry = { name: entryName(file.name), text: await file.text() }
 			this.add(entry)
-			this.startPlacing(entry)
+			this.startPlacing(entry.name)
 		})
 		input.click()
 	}
 
 	/**
-	 * places the components of the entry like a symbol: they follow the cursor and snap to the grid until a click places them
+	 * places an instance of the component like a symbol: it follows the cursor and snaps to the grid until a click places it
 	 */
-	public startPlacing(entry: LibraryEntry) {
+	public startPlacing(path: string) {
 		if (ComponentPlacer.instance.component) {
 			ComponentPlacer.instance.placeCancel()
 		}
-		let components: CircuitComponent[]
-		try {
-			components = componentsFromFile(JSON.parse(entry.text))
-		} catch (e) {
-			console.error(`draw.tikz: could not load the component "${entry.name}"`, e)
-			alert(`The component "${entry.name}" could not be loaded: ${e}`)
-			return
-		}
-		if (components.length == 0) {
-			return
-		}
 		MainController.instance.switchMode(Modes.COMPONENT)
-		ComponentPlacer.instance.placeComponent(GroupComponent.forPlacement(components))
+		ComponentPlacer.instance.placeComponent(InstanceComponent.newForPlacement(path))
 	}
 }
 
@@ -184,7 +233,7 @@ export function addLibraryToPicker(accordion: HTMLElement, hidePicker: () => voi
 		body.replaceChildren()
 		for (const entry of ComponentLibrary.instance.entries) {
 			const item = addItem(entry.name, "my component " + entry.name, () =>
-				ComponentLibrary.instance.startPlacing(entry)
+				ComponentLibrary.instance.startPlacing(entry.name)
 			)
 			const preview = previewOf(entry)
 			if (preview) {
@@ -205,11 +254,18 @@ export function addLibraryToPicker(accordion: HTMLElement, hidePicker: () => voi
 				})
 			}
 		}
-		const importItem = addItem("Import a component or drawing from a file", "import file json", () =>
-			ComponentLibrary.instance.importFile()
+		const importItem = addItem(
+			isVSCodeHost ?
+				"Place a component or drawing: choose a file or enter its path relative to the workspace folder"
+			:	"Import a component or drawing from a file",
+			"import file json path",
+			() => ComponentLibrary.instance.importFile()
 		)
 		importItem.classList.add("libraryComponentText")
-		importItem.innerHTML = `<span class="material-symbols-outlined">file_open</span> Import file...`
+		importItem.innerHTML =
+			isVSCodeHost ?
+				`<span class="material-symbols-outlined">file_open</span> From file or path...`
+			:	`<span class="material-symbols-outlined">file_open</span> Import file...`
 	}
 	ComponentLibrary.instance.onChange = render
 	render()
@@ -274,7 +330,7 @@ function componentsToFile(components: CircuitComponent[]): string {
  * creates the components of a component file (or any drawing). The environment settings of the file are ignored, the
  * components get the ones of the current drawing.
  */
-function componentsFromFile(file: SaveFileFormat): CircuitComponent[] {
+export function componentsFromFile(file: SaveFileFormat): CircuitComponent[] {
 	// files of old versions are only a list of components
 	const saveObjects: ComponentSaveObject[] = Array.isArray(file) ? file : (file.components ?? [])
 	return saveObjects.map((saveObject) => CircuitComponent.fromJson(saveObject)).filter((component) => component)

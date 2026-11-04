@@ -54,6 +54,7 @@ export * from "./components/rectangleComponent"
 export * from "./components/ellipseComponent"
 export * from "./components/polygonComponent"
 export * from "./components/groupComponent"
+export * from "./components/instanceComponent"
 export * from "./components/shortComponent"
 export * from "./components/openComponent"
 // snapDrag

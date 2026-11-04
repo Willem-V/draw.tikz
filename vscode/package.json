@@ -2,7 +2,7 @@
 	"name": "draw-tikz",
 	"displayName": "draw.tikz",
 	"description": "Visual editor for CircuiTikZ/TikZ drawings: edit *.drawtikz.json files and export them to TikZ or SVG",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"publisher": "willem-v",
 	"license": "GPL-3.0-only",
 	"repository": {
@@ -55,13 +55,8 @@
 			"properties": {
 				"drawtikz.defaultExportFolder": {
 					"type": "string",
-					"default": "fig",
-					"description": "Folder (relative to the workspace folder) suggested when a drawing is exported for the first time"
-				},
-				"drawtikz.componentFolder": {
-					"type": "string",
-					"default": "components",
-					"description": "Folder (relative to the workspace folder) with reusable components: its *.drawtikz.json files are listed under \"My components\" in the symbol picker"
+					"default": "",
+					"description": "Folder (relative to the workspace folder) suggested when a drawing is exported for the first time. Empty: next to the drawing"
 				}
 			}
 		}

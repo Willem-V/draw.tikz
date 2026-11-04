@@ -679,11 +679,11 @@ export class MainController {
 					this.hostExports = { ...this.hostExports, [message.format]: message.path }
 					this.drawingChanged()
 					break
-				case "library":
-					ComponentLibrary.instance.setEntries(message.components)
+				case "componentFile":
+					ComponentLibrary.instance.setFile(message.path, message.text)
 					break
 				case "placeComponent":
-					ComponentLibrary.instance.startPlacing(message.component)
+					ComponentLibrary.instance.startPlacing(message.path)
 					break
 			}
 		})
@@ -826,6 +826,16 @@ export class MainController {
 				transformSelection(() => SelectionController.instance.rotateSelection(90))
 			}
 			return false
+		})
+
+		// edit the text of the selected text component on the canvas
+		hotkeys("enter,f2", () => {
+			const selected = SelectionController.instance.currentlySelectedComponents
+			if (this.mode != Modes.COMPONENT && selected.length == 1 && selected[0] instanceof RectangleComponent) {
+				selected[0].editTextInPlace()
+				return false
+			}
+			return true
 		})
 
 		//flip selection

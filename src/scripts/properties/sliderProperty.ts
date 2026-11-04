@@ -49,6 +49,19 @@ export class SliderProperty extends EditableProperty<SVG.Number> {
 	 */
 	public buttonStep: number
 
+	/**
+	 * shows (and takes) the number multiplied by this factor, e.g. to edit a size in grid steps while it is stored in other
+	 * units. The value itself, min, max and the steps stay in the stored unit.
+	 */
+	public displayFactor = 1
+	/** replaces the unit in the input field if the number is shown multiplied by displayFactor */
+	public displayUnit: string | undefined
+	/**
+	 * replaces the − and + buttons' fixed step, e.g. to go to the next allowed value.
+	 * @returns the new value, or undefined to use the default step
+	 */
+	public stepHandler?: (direction: -1 | 1) => number | undefined
+
 	private get defaultButtonStep(): number {
 		const rough = (this.max - this.min) / 40
 		const power = 10 ** Math.floor(Math.log10(rough))
@@ -77,10 +90,15 @@ export class SliderProperty extends EditableProperty<SVG.Number> {
 				if (Number.isNaN(this.value.value)) {
 					return
 				}
-				const step = ev.shiftKey ? this.step : (this.buttonStep ?? this.defaultButtonStep)
-				// go to the next multiple of the step, so values stay round numbers
-				const steps = Math.round(this.value.value / step + direction * 0.5001)
-				this.setFromInput(Math.round(steps * step * 1e6) / 1e6, true)
+				const custom = ev.shiftKey ? undefined : this.stepHandler?.(direction)
+				if (custom !== undefined) {
+					this.setFromInput(custom, true)
+				} else {
+					const step = ev.shiftKey ? this.step : (this.buttonStep ?? this.defaultButtonStep)
+					// go to the next multiple of the step, so values stay round numbers
+					const steps = Math.round(this.value.value / step + direction * 0.5001)
+					this.setFromInput(Math.round(steps * step * 1e6) / 1e6, true)
+				}
 				this.updateNumberInput()
 				Undo.addState()
 			})
@@ -94,9 +112,9 @@ export class SliderProperty extends EditableProperty<SVG.Number> {
 		this.numberInput.style.width = "5.5em"
 		this.numberInput.type = "number"
 		this.numberInput.placeholder = "–"
-		this.numberInput.min = this.min.toString()
-		this.numberInput.max = this.max.toString()
-		this.numberInput.step = this.step.toString()
+		this.numberInput.min = this.fromStored(this.min).toString()
+		this.numberInput.max = this.fromStored(this.max).toString()
+		this.numberInput.step = this.fromStored(this.step).toString()
 		col.appendChild(this.numberInput)
 
 		this.increaseButton = stepButton("add", 1)
@@ -105,7 +123,7 @@ export class SliderProperty extends EditableProperty<SVG.Number> {
 		this.numberInput.addEventListener("input", () => {
 			let newValue = Number.parseFloat(this.numberInput.value)
 			if (!isNaN(newValue)) {
-				this.setFromInput(newValue, this.restrictToRange)
+				this.setFromInput(newValue / this.displayFactor, this.restrictToRange)
 			}
 		})
 		this.numberInput.addEventListener("focusout", () => {
@@ -116,10 +134,10 @@ export class SliderProperty extends EditableProperty<SVG.Number> {
 			CanvasController.instance.draggingFromInput = this.numberInput
 		})
 
-		if (this.value.unit) {
+		if (this.value.unit || this.displayUnit) {
 			this.unitLabel = document.createElement("label") as HTMLLabelElement
 			this.unitLabel.classList.add("input-group-text", "fs-6")
-			this.unitLabel.innerText = this.value.unit
+			this.unitLabel.innerText = this.displayUnit ?? this.value.unit
 			col.appendChild(this.unitLabel)
 		}
 
@@ -127,6 +145,11 @@ export class SliderProperty extends EditableProperty<SVG.Number> {
 
 		row.appendChild(col)
 		return row
+	}
+
+	/** the number as shown in the input field */
+	private fromStored(value: number): number {
+		return this.displayFactor == 1 ? value : Math.round(value * this.displayFactor * 1000) / 1000
 	}
 
 	/**
@@ -147,9 +170,9 @@ export class SliderProperty extends EditableProperty<SVG.Number> {
 
 	private updateNumberInput() {
 		// different values of several components: empty with a dash as placeholder
-		this.numberInput.value = !Number.isNaN(this.value.value) ? this.value.value.toString() : ""
+		this.numberInput.value = !Number.isNaN(this.value.value) ? this.fromStored(this.value.value).toString() : ""
 		if (this.unitLabel) {
-			this.unitLabel.innerText = !Number.isNaN(this.value.value) ? this.value.unit : ""
+			this.unitLabel.innerText = !Number.isNaN(this.value.value) ? (this.displayUnit ?? this.value.unit) : ""
 		}
 	}
 
@@ -174,6 +197,8 @@ export class SliderProperty extends EditableProperty<SVG.Number> {
 		)
 
 		result.buttonStep = this.buttonStep
+		result.displayFactor = this.displayFactor
+		result.displayUnit = this.displayUnit
 		result.addChangeListener((ev) => {
 			for (const property of properties) {
 				property.updateValue(ev.value, true, true)
