@@ -14,6 +14,8 @@ export type DragCallbacks = {
 	dragStart?(pos: SVG.Point, ev?: MouseEvent | TouchEvent): void
 	dragMove?(pos: SVG.Point, ev?: MouseEvent | TouchEvent): void
 	dragEnd?(): boolean //return true if an Undo state can be added
+	/** if the position should not be snapped to the grid and other components (as with Shift), e.g. because the callbacks snap it themselves */
+	noSnap?(): boolean
 }
 
 type DragHandler = {
@@ -300,7 +302,7 @@ export class AdjustDragHandler {
 		SnapController.instance.updateSnapPoints(this.componentReference, true)
 		if (this.dragCallbacks && this.dragCallbacks.dragStart) {
 			const draggedPoint = new SVG.Point(event.detail.box.cx, event.detail.box.cy)
-			let shiftKey = event.detail.event.shiftKey
+			let shiftKey = event.detail.event.shiftKey || this.dragCallbacks.noSnap?.()
 			let destination =
 				shiftKey ? draggedPoint : SnapController.instance.snapPoint(draggedPoint, this.componentReference)
 			this.dragCallbacks.dragStart(destination, event.detail.event)
@@ -327,7 +329,7 @@ export class AdjustDragHandler {
 
 		const draggedPoint = new SVG.Point(event.detail.box.cx, event.detail.box.cy)
 
-		let shiftKey = event.detail.event.shiftKey
+		let shiftKey = event.detail.event.shiftKey || this.dragCallbacks?.noSnap?.()
 		let destination =
 			shiftKey ? draggedPoint : SnapController.instance.snapPoint(draggedPoint, this.componentReference)
 

@@ -32,7 +32,7 @@ import {
 } from "../internal"
 import { resizeSVG, roundTikz, selectedBoxWidth } from "../utils/selectionHelper"
 import { createSizeProperties, SizeProperties } from "../utils/sizeProperties"
-import { closestMuxGridSize, muxGridSizes, muxLead, MuxShape, pinSides, PinSide } from "../utils/muxGrid"
+import { closestMuxGridSize, muxGridSizes, MuxGridSize, muxLead, MuxShape, pinSides, PinSide } from "../utils/muxGrid"
 import { alwaysOnGrid, gridScales, gridSpacingPx, mainPins, maxDefaultSizeChange, roundScale } from "../utils/gridFit"
 
 // TODO don't use <use> element as the component visualisation, but directly the symbol's children
@@ -243,7 +243,7 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 					createSizeProperties(
 						width,
 						height,
-						"Relative to 0.56cm, as w and Lh of the circuitikz muxdemux (without the leads). Can also be changed with the handles on the block.",
+						"Shown in grid steps (stored relative to 0.56cm, as w and Lh of the circuitikz muxdemux, without the leads). Can also be changed with the handles on the block.",
 						"manipulation:pinBlock",
 						(changed) => this.sizeChanged(changed),
 						{ max: 40 }
@@ -251,7 +251,7 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 				:	createSizeProperties(
 						width,
 						height,
-						"Relative to 0.56cm, as w and Lh of the circuitikz muxdemux (without the leads). Can also be changed with the handles on the mux.",
+						"Shown in grid steps (stored relative to 0.56cm, as w and Lh of the circuitikz muxdemux, without the leads). Can also be changed with the handles on the mux.",
 						"manipulation:mux",
 						(changed) => this.sizeChanged(changed),
 						{ max: 40, heightLabel: "Left height", linked: [this.createMuxRightHeight()] }
@@ -272,6 +272,9 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 				)
 				this.muxGridSnap.addChangeListener(() => this.sizeChanged())
 				this.properties.add(PropertyCategories.manipulation, this.muxGridSnap)
+			}
+			if (this.isMuxdemux()) {
+				this.setupMuxSizeDisplay()
 			}
 		} else {
 			this.gridSizeProperty = new GridSizeProperty(() => this.gridScales(), new SVG.Point(1, 1))
@@ -457,7 +460,7 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 			0.05,
 			new SVG.Number(muxdemuxDefaults.mux.rightHeight),
 			false,
-			"Relative to 0.56cm, as Rh of the circuitikz muxdemux. Can also be changed with the handles on the right side of the mux.",
+			"Shown in grid steps (stored relative to 0.56cm, as Rh of the circuitikz muxdemux). Can also be changed with the handles on the right side of the mux.",
 			"manipulation:mux:rightHeight"
 		)
 		this.muxRightHeight.addChangeListener(() => this.sizeChanged(this.muxRightHeight))
@@ -593,13 +596,52 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 		this.updateOptions()
 	}
 
+	/** the number of pins on each side */
+	private pinCountsBySide(): Record<PinSide, number> {
+		return Object.fromEntries(pinSides.map((side) => [side, this.pinCount(side)])) as Record<PinSide, number>
+	}
+
+	/**
+	 * the sizes of the mux or block are stored relative to 0.56cm (as in circuitikz), which gives numbers like 3.5714 when
+	 * the pins are on the grid. They are shown and edited in grid steps instead. With snapping, the − and + buttons go to
+	 * the next size at which all pins are on the grid.
+	 */
+	private setupMuxSizeDisplay() {
+		const unit = muxdemuxUnit / gridSpacingPx()
+		const sliders: [SliderProperty, keyof MuxGridSize][] = [
+			[this.shapeSize.width, "width"],
+			[this.shapeSize.height, "leftHeight"],
+		]
+		if (this.muxRightHeight) {
+			sliders.push([this.muxRightHeight, "rightHeight"])
+		}
+		for (const [slider, dimension] of sliders) {
+			slider.displayFactor = unit
+			slider.displayUnit = "grid"
+			slider.stepHandler = (direction) => {
+				if (!this.muxGridSnap?.value) {
+					return undefined
+				}
+				const sizes = muxGridSizes(
+					this.pinCountsBySide(),
+					this.muxSquarePins?.value ?? false,
+					this.shapeKind != "mux"
+				)
+				const current = slider.value.value * unit
+				const values = [...new Set(sizes.map((size) => size[dimension]))].sort((a, b) => a - b)
+				const next =
+					direction > 0 ?
+						values.find((v) => v > current + 0.01)
+					:	values.reverse().find((v) => v < current - 0.01)
+				return next === undefined ? undefined : next / unit
+			}
+		}
+	}
+
 	private snapSizeToGrid(changed?: SliderProperty) {
 		const equalHeights = this.shapeKind != "mux"
 		const unit = muxdemuxUnit / gridSpacingPx()
-		const counts = Object.fromEntries(pinSides.map((side) => [side, this.pinCount(side)])) as Record<
-			PinSide,
-			number
-		>
+		const counts = this.pinCountsBySide()
 		const sizes = muxGridSizes(counts, this.muxSquarePins?.value ?? false, equalHeights)
 		const left = this.shapeSize.height.value.value * unit
 		const wanted = {
@@ -776,6 +818,9 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 					dragEnd: () => {
 						return currentSize().some((value, index) => value != startSize[index])
 					},
+					// with snapping to the mux grid, the size follows the pointer directly: snapping to the canvas grid first would
+					// only add a second, unrelated snap
+					noSnap: () => this.isMuxdemux() && !!this.muxGridSnap?.value,
 				})
 				this.shapeResizeHandles.push({ direction: direction, element: element })
 			}
