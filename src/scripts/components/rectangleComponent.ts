@@ -26,7 +26,9 @@ import {
 	RadioButtonProperty,
 	defaultStroke,
 	Undo,
+	MainController,
 } from "../internal"
+import { HintBar } from "../utils/hintBar"
 import { pointInsideRect, rectRectIntersection, roundTikz, selectionSize } from "../utils/selectionHelper"
 
 export type RectangleSaveObject = ShapeSaveObject & {
@@ -413,6 +415,12 @@ export class RectangleComponent extends ShapeComponent {
 		document.body.appendChild(editor)
 		editor.focus()
 		editor.select()
+		const ctrl = MainController.instance.isMac ? "⌘" : "Ctrl"
+		HintBar.show("Editing text", "", [
+			{ key: `${ctrl}+Enter`, action: "finish" },
+			{ key: "Esc", action: "finish" },
+			{ key: "Enter", action: "new line" },
+		])
 
 		editor.addEventListener("input", () => this.textAreaProperty.updateValue(editor.value, true))
 		editor.addEventListener("keydown", (ev) => {
@@ -426,6 +434,7 @@ export class RectangleComponent extends ShapeComponent {
 		editor.addEventListener("blur", () => {
 			this.inPlaceEditor = undefined
 			editor.remove()
+			HintBar.clear()
 			if (this.textAreaProperty.value != startText) {
 				Undo.addState()
 			}
