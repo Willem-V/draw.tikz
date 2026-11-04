@@ -114,7 +114,6 @@ Bugs that also occur in the original CircuiTi*k*Z-Designer can be reported [upst
 
 ## Todos
 
-- [ ] Copy/pasting text components doesn't work: weird text appears that looks like internal LaTeX code.
 - [ ] Editing text is awkward.
 - [x] Adding a new drawing by entering a path doesn't work. Paths should be parsed so drawings can be created in subfolders. Create missing subfolders (`mkdir -p`), but ask for confirmation first in case of a typo.
 - [x] Real hierarchy: a component placed from the component library stays linked to its `*.drawtikz.json` file (like an instance of a subcircuit) and updates when that file changes, instead of being a copy. Components don't have to come from a fixed `components` folder: the extension doesn't force any folder names, and a component is chosen by entering a path relative to the working directory.
