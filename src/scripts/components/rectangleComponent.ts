@@ -25,6 +25,7 @@ import {
 	buildTikzStringFromNodeCommand,
 	RadioButtonProperty,
 	defaultStroke,
+	Undo,
 } from "../internal"
 import { pointInsideRect, rectRectIntersection, roundTikz, selectionSize } from "../utils/selectionHelper"
 
@@ -192,10 +193,10 @@ export class RectangleComponent extends ShapeComponent {
 			this.update()
 		})
 		this.properties.add(PropertyCategories.text, this.textAreaProperty)
-		// double click on the rectangle: edit the text right away instead of looking for the text field
+		// double click on the rectangle: edit the text directly on the canvas
 		this.visualization.on("dblclick", (ev) => {
 			ev.preventDefault()
-			setTimeout(() => this.textAreaProperty.focus(), 0)
+			setTimeout(() => this.editTextInPlace(), 0)
 		})
 
 		this.textAreaPlaceHolder = new BooleanProperty(
@@ -369,6 +370,66 @@ export class RectangleComponent extends ShapeComponent {
 		return !selectionCorners.every((corner) =>
 			pointInsideRect(corner.rotate(-this.rotationDeg, this.position), inner)
 		)
+	}
+
+	private inPlaceEditor: HTMLTextAreaElement | undefined
+
+	/**
+	 * edits the text directly on the canvas: a text field over the rectangle, which changes the text while typing.
+	 * Escape, Ctrl+Enter or a click somewhere else finishes the editing.
+	 */
+	public editTextInPlace() {
+		const svg = CanvasController.instance.canvas.node as unknown as SVGSVGElement
+		const ctm = svg.getScreenCTM()
+		if (this.inPlaceEditor || !ctm) {
+			return
+		}
+		const scale = Math.hypot(ctm.a, ctm.b)
+		const center = new DOMPoint(this.position.x, this.position.y).matrixTransform(ctm)
+		const editor = document.createElement("textarea")
+		this.inPlaceEditor = editor
+		const align = ["left", "center", "right", "justify"][this.textAreaAlign.value.numberID] ?? "left"
+		Object.assign(editor.style, {
+			position: "fixed",
+			left: `${center.x}px`,
+			top: `${center.y}px`,
+			width: `${Math.max(this.size.x * scale, 120)}px`,
+			height: `${Math.max(this.size.y * scale, 48)}px`,
+			transform: `translate(-50%, -50%) rotate(${-this.rotationDeg}deg)`,
+			zIndex: "2000",
+			resize: "none",
+			textAlign: align,
+			padding: "4px",
+			font: `${Math.max(12, 12 * scale)}px "Computer Modern Serif", serif`,
+			color: "var(--bs-body-color)",
+			background: "var(--bs-body-bg)",
+			border: "2px solid var(--bs-primary)",
+			borderRadius: "4px",
+			boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
+		})
+		editor.placeholder = "text"
+		editor.value = this.textAreaProperty.value ?? ""
+		const startText = editor.value
+		document.body.appendChild(editor)
+		editor.focus()
+		editor.select()
+
+		editor.addEventListener("input", () => this.textAreaProperty.updateValue(editor.value, true))
+		editor.addEventListener("keydown", (ev) => {
+			ev.stopPropagation()
+			if (ev.key == "Escape" || (ev.key == "Enter" && (ev.ctrlKey || ev.metaKey))) {
+				ev.preventDefault()
+				editor.blur()
+			}
+		})
+		editor.addEventListener("mousedown", (ev) => ev.stopPropagation())
+		editor.addEventListener("blur", () => {
+			this.inPlaceEditor = undefined
+			editor.remove()
+			if (this.textAreaProperty.value != startText) {
+				Undo.addState()
+			}
+		})
 	}
 
 	public update(): void {

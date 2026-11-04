@@ -32,6 +32,7 @@ import {
 } from "../internal"
 import { resizeSVG, roundTikz, selectedBoxWidth } from "../utils/selectionHelper"
 import { createSizeProperties, SizeProperties } from "../utils/sizeProperties"
+import { orientedSymbol } from "../utils/symbolText"
 import { closestMuxGridSize, muxGridSizes, MuxGridSize, muxLead, MuxShape, pinSides, PinSide } from "../utils/muxGrid"
 import { alwaysOnGrid, gridScales, gridSpacingPx, mainPins, maxDefaultSizeChange, roundScale } from "../utils/gridFit"
 
@@ -1030,13 +1031,16 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 		if (this.gridSizeProperty) {
 			this.gridSizeProperty.value = new SVG.Point(Math.abs(this.scaleState.x), Math.abs(this.scaleState.y))
 		}
-		// the symbol can change with the global transistor arrow position
-		const symbolHref = "#" + variantSymbol(this.componentVariant).id()
+		let m = this.getTransformMatrix()
+		// the symbol can change with the global transistor arrow position and with the text, which LaTeX keeps upright
+		let symbol = variantSymbol(this.componentVariant)
+		if (!this.shapeSymbol) {
+			symbol = orientedSymbol(symbol, m)
+		}
+		const symbolHref = "#" + symbol.id()
 		if (this.componentVisualization.node.getAttribute("href") != symbolHref) {
 			this.componentVisualization.node.setAttribute("href", symbolHref)
 		}
-
-		let m = this.getTransformMatrix()
 		this.componentVisualization.transform(m)
 		this._bbox = this.componentVariant.viewBox.transform(m)
 

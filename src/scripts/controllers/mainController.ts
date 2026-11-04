@@ -828,6 +828,16 @@ export class MainController {
 			return false
 		})
 
+		// edit the text of the selected text component on the canvas
+		hotkeys("enter,f2", () => {
+			const selected = SelectionController.instance.currentlySelectedComponents
+			if (this.mode != Modes.COMPONENT && selected.length == 1 && selected[0] instanceof RectangleComponent) {
+				selected[0].editTextInPlace()
+				return false
+			}
+			return true
+		})
+
 		//flip selection
 		hotkeys("shift+x", () => {
 			if (this.mode == Modes.COMPONENT) {
