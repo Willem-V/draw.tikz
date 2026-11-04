@@ -679,11 +679,11 @@ export class MainController {
 					this.hostExports = { ...this.hostExports, [message.format]: message.path }
 					this.drawingChanged()
 					break
-				case "library":
-					ComponentLibrary.instance.setEntries(message.components)
+				case "componentFile":
+					ComponentLibrary.instance.setFile(message.path, message.text)
 					break
 				case "placeComponent":
-					ComponentLibrary.instance.startPlacing(message.component)
+					ComponentLibrary.instance.startPlacing(message.path)
 					break
 			}
 		})

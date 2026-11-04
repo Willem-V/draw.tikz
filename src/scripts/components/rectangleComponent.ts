@@ -192,6 +192,11 @@ export class RectangleComponent extends ShapeComponent {
 			this.update()
 		})
 		this.properties.add(PropertyCategories.text, this.textAreaProperty)
+		// double click on the rectangle: edit the text right away instead of looking for the text field
+		this.visualization.on("dblclick", (ev) => {
+			ev.preventDefault()
+			setTimeout(() => this.textAreaProperty.focus(), 0)
+		})
 
 		this.textAreaPlaceHolder = new BooleanProperty(
 			"Placeholder",
@@ -370,7 +375,7 @@ export class RectangleComponent extends ShapeComponent {
 		super.update()
 		// a frame can only be grabbed at its border, otherwise the whole area can be grabbed
 		if (this.isFrameOnly()) {
-			this.dragElement.attr({ fill: "none", stroke: "transparent", "stroke-width": selectionSize })
+			this.dragElement.attr({ "fill": "none", "stroke": "transparent", "stroke-width": selectionSize })
 		} else {
 			this.dragElement.attr({ fill: "transparent", stroke: "none" })
 		}

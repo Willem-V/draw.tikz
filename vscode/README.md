@@ -7,7 +7,7 @@ Visual editor for CircuiTi*k*Z/Ti*k*Z drawings. Files ending in `.drawtikz.json`
 - Right-click a folder in the Explorer > **New drawing**, or run `draw.tikz: New drawing`
 - Open any `*.drawtikz.json` file to edit it visually. Use **Reopen Editor With... > Text Editor** to see the JSON
 - Save and undo/redo work like for any other file
-- Select a part of a drawing and click **Save as component** to reuse it: files in the component folder appear under "My components" in the symbol picker
+- Select a part of a drawing and click **Save as component** to reuse it: place it from "My components" > "From file or path..." in the symbol picker (type a path relative to the workspace folder, or browse). The placed component is linked to its file and updates when the file changes
 - Export to Ti*k*Z or SVG from the editor. The first export of a drawing asks where to write the file; later exports overwrite the same file
 
 All controls of the editor are explained in its help menu (circled question mark in the top right corner).
@@ -16,8 +16,7 @@ All controls of the editor are explained in its help menu (circled question mark
 
 | Setting                        | Default      | Description                                                                                                           |
 | ------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `drawtikz.defaultExportFolder` | `fig`        | Folder (relative to the workspace folder) suggested the first time a drawing is exported                              |
-| `drawtikz.componentFolder`     | `components` | Folder (relative to the workspace folder) with reusable components, listed under "My components" in the symbol picker |
+| `drawtikz.defaultExportFolder` | (empty)      | Folder (relative to the workspace folder) suggested the first time a drawing is exported; empty: next to the drawing |
 
 ## More
 

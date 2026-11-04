@@ -1,6 +1,7 @@
 import * as SVG from "@svgdotjs/svg.js"
 import {
 	IconToolbarProperty,
+	ToolbarGroup,
 	CircuitComponent,
 	ComponentSaveObject,
 	MainController,
@@ -37,8 +38,10 @@ export class GroupComponent extends CircuitComponent {
 		this.displayName = "Group"
 		this.snappingPoints = []
 		this.groupedComponents.push(...components)
-		const idx = this.visualization.parent().index(components[0].visualization)
-		this.visualization.parent().add(this.visualization, idx)
+		if (components.length > 0) {
+			const idx = this.visualization.parent().index(components[0].visualization)
+			this.visualization.parent().add(this.visualization, idx)
+		}
 		let firstIndex = -1
 		for (const component of components) {
 			const idx = MainController.instance.circuitComponents.indexOf(component)
@@ -49,35 +52,45 @@ export class GroupComponent extends CircuitComponent {
 			this.visualization.add(component.visualization)
 		}
 
-		MainController.instance.circuitComponents.splice(firstIndex, 0, this) // added here
+		if (firstIndex < 0) {
+			MainController.instance.circuitComponents.push(this)
+		} else {
+			MainController.instance.circuitComponents.splice(firstIndex, 0, this) // added here
+		}
 
-		const grouping = new IconToolbarProperty(
-			[
-				{
-					label: "Group",
-					buttons: [
-						{
-							icon: "group_off",
-							text: "Ungroup",
-							tooltip: "Dissolve the group",
-							onClick: () => this.ungroup(),
-						},
-						{
-							icon: "bookmark_add",
-							text: "Save as component",
-							tooltip: "Save the group as a component for the symbol picker",
-							onClick: () => ComponentLibrary.instance.save([this]),
-						},
-					],
-				},
-			],
-			"ordering:ungroup"
+		this.properties.add(
+			PropertyCategories.manipulation,
+			new IconToolbarProperty(this.toolbarGroups(), "ordering:ungroup")
 		)
-		this.properties.add(PropertyCategories.manipulation, grouping)
 
 		this.update()
 		SelectionController.instance.selectComponents([this], SelectionMode.RESET)
 		this.snappingPoints = this.groupedComponents.map((component) => component.snappingPoints).flat()
+	}
+
+	/**
+	 * the buttons of the group in the properties window
+	 */
+	protected toolbarGroups(): ToolbarGroup[] {
+		return [
+			{
+				label: "Group",
+				buttons: [
+					{
+						icon: "group_off",
+						text: "Ungroup",
+						tooltip: "Dissolve the group",
+						onClick: () => this.ungroup(),
+					},
+					{
+						icon: "bookmark_add",
+						text: "Save as component",
+						tooltip: "Save the group as a component, which can be placed into drawings",
+						onClick: () => ComponentLibrary.instance.save([this]),
+					},
+				],
+			},
+		]
 	}
 
 	public static group(circuitComponents: CircuitComponent[]) {
@@ -108,7 +121,7 @@ export class GroupComponent extends CircuitComponent {
 	/**
 	 * replaces the group by its components (without selecting them or adding an undo state)
 	 */
-	private dissolve() {
+	protected dissolve() {
 		const idx = MainController.instance.circuitComponents.indexOf(this)
 		MainController.instance.circuitComponents.splice(idx, 1, ...this.groupedComponents)
 		const parent = this.visualization.parent()
@@ -164,8 +177,18 @@ export class GroupComponent extends CircuitComponent {
 		}
 		this.update()
 	}
+	/**
+	 * the area of a group without components (only possible for subclasses which load their components later)
+	 */
+	protected emptyBox(): SVG.Box {
+		return new SVG.Box(0, 0, 0, 0)
+	}
+
 	public update(): void {
 		this._bbox = undefined
+		if (this.groupedComponents.length == 0) {
+			this._bbox = this.emptyBox()
+		}
 		for (const component of this.groupedComponents) {
 			if (this._bbox) {
 				this._bbox = this._bbox.merge(component.bbox)
