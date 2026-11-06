@@ -1,3 +1,4 @@
+import { Palette } from "../utils/palette"
 import { Modal, Tooltip } from "bootstrap"
 import {
 	SelectionController,
@@ -147,10 +148,13 @@ export class ExportController {
 				"\\usetikzlibrary{" + requiredTikzLibraries.values().toArray().join(", ") + "}"
 			:	""
 
+		// the colors of the palette which are used
+		const colorDefinitions = Palette.instance.tikzDefinitions(circuitElements.join("\n"))
 		const tikzSettings = EnvironmentVariableController.instance.getTikzSettings()
 		let arr = [
 			"\\begin{tikzpicture}" + "[" + ["transform shape"].concat(tikzSettings.environment).join(", ") + "]",
 			...tikzSettings.ctikzset.map((setting) => "\t\\ctikzset{" + setting + "}"),
+			...colorDefinitions.map((definition) => "\t" + definition),
 			"\t% Paths, nodes and wires:",
 			...circuitElements,
 			"\\end{tikzpicture}",

@@ -28,6 +28,7 @@ import {
 	Undo,
 	MainController,
 } from "../internal"
+import { paletteNameOf, resolveColor } from "../utils/palette"
 import { HintBar } from "../utils/hintBar"
 import { pointInsideRect, rectRectIntersection, roundTikz, selectionSize } from "../utils/selectionHelper"
 
@@ -70,6 +71,8 @@ export type Text = {
 	fontSize?: string
 	innerSep?: SVG.Number
 	color?: string | "default"
+	/** the entry of the palette of the drawing the color comes from */
+	palette?: string
 	showPlaceholderText?: boolean
 	useHyphenation?: boolean
 }
@@ -580,6 +583,7 @@ export class RectangleComponent extends ShapeComponent {
 				}
 				if (this.textColor.value) {
 					textData.color = this.textColor.value.toString()
+					textData.palette = paletteNameOf(this.textColor.value)
 				}
 				hasText = true
 			}
@@ -658,7 +662,7 @@ export class RectangleComponent extends ShapeComponent {
 				this.textInnerSep.value = new SVG.Number("5pt")
 			}
 
-			this.textColor.value = saveObject.text.color ? new SVG.Color(saveObject.text.color) : null
+			this.textColor.value = resolveColor(saveObject.text.color, saveObject.text.palette)
 		}
 
 		this.update()

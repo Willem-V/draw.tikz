@@ -1,3 +1,4 @@
+import { paletteNameOf, resolveColor } from "../utils/palette"
 import * as SVG from "@svgdotjs/svg.js"
 import {
 	AbstractConstructor,
@@ -11,6 +12,8 @@ import {
 
 export type FillInfo = {
 	color?: string | "default"
+	/** the entry of the palette of the drawing the color comes from */
+	palette?: string
 	opacity?: number
 }
 
@@ -54,6 +57,7 @@ export function Fillable<TBase extends AbstractConstructor<CircuitComponent>>(Ba
 
 			this.fillColorProperty = new ColorProperty("Color", null, undefined, undefined, "fill:color")
 			this.fillColorProperty.addChangeListener((ev) => {
+				this.fillInfo.palette = paletteNameOf(ev.value)
 				if (ev.value == null) {
 					this.fillInfo.color = "default"
 					this.fillInfo.opacity = 1
@@ -76,6 +80,9 @@ export function Fillable<TBase extends AbstractConstructor<CircuitComponent>>(Ba
 			let shouldFill = false
 			if (this.fillInfo.color != "default") {
 				fill.color = this.fillInfo.color
+				if (this.fillInfo.palette) {
+					fill.palette = this.fillInfo.palette
+				}
 				shouldFill = true
 			}
 			if (this.fillInfo.opacity != 1) {
@@ -94,8 +101,10 @@ export function Fillable<TBase extends AbstractConstructor<CircuitComponent>>(Ba
 
 			if (saveObject.fill) {
 				if (saveObject.fill.color) {
-					this.fillInfo.color = saveObject.fill.color
-					this.fillColorProperty.value = new SVG.Color(saveObject.fill.color)
+					const color = resolveColor(saveObject.fill.color, saveObject.fill.palette)
+					this.fillInfo.color = color.toRgb()
+					this.fillInfo.palette = paletteNameOf(color)
+					this.fillColorProperty.value = color
 				}
 				if (saveObject.fill.opacity != undefined) {
 					this.fillInfo.opacity = saveObject.fill.opacity
@@ -108,7 +117,7 @@ export function Fillable<TBase extends AbstractConstructor<CircuitComponent>>(Ba
 			super.buildTikzCommand(command)
 			if (this.fillInfo.opacity > 0) {
 				if (this.fillInfo.color !== "default") {
-					let c = new SVG.Color(this.fillInfo.color)
+					let c = resolveColor(this.fillInfo.color, this.fillInfo.palette)
 					command.options.push("fill=" + c.toTikzString())
 				}
 

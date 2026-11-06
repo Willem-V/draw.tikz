@@ -1,3 +1,4 @@
+import { paletteNameOf, resolveColor } from "../utils/palette"
 import * as SVG from "@svgdotjs/svg.js"
 import {
 	AbstractConstructor,
@@ -30,6 +31,8 @@ export type Label = {
 	rendering?: SVG.Element
 	distance?: SVG.Number
 	color?: string | "default"
+	/** the entry of the palette of the drawing the color comes from */
+	palette?: string
 }
 
 export type PositionedLabel = Label & {
@@ -130,6 +133,7 @@ export function PositionLabelable<TBase extends AbstractConstructor<CircuitCompo
 					relativeToComponent: this.labelReferenceProperty.value.key == "component" ? true : undefined,
 					distance: this.labelDistance.value.value != 0.12 ? this.labelDistance.value : undefined,
 					color: this.labelColor.value ? this.labelColor.value.toString() : undefined,
+					palette: paletteNameOf(this.labelColor.value),
 				}
 				data.label = labelWithoutRender
 			}
@@ -172,7 +176,7 @@ export function PositionLabelable<TBase extends AbstractConstructor<CircuitCompo
 					this.labelReferenceProperty.value = this.labelReferenceChoices[1]
 				}
 				this.mathJaxLabel.value = saveObject.label.value
-				this.labelColor.value = saveObject.label.color ? new SVG.Color(saveObject.label.color) : null
+				this.labelColor.value = resolveColor(saveObject.label.color, saveObject.label.palette)
 				this.generateLabelRender()
 			}
 		}
@@ -293,6 +297,7 @@ export function PathLabelable<TBase extends AbstractConstructor<CircuitComponent
 					otherSide: this.labelSide.value ? true : undefined,
 					distance: this.labelDistance.value.value != 0.12 ? this.labelDistance.value : undefined,
 					color: this.labelColor.value ? this.labelColor.value.toString() : undefined,
+					palette: paletteNameOf(this.labelColor.value),
 				}
 				data.label = label
 			}
@@ -320,7 +325,7 @@ export function PathLabelable<TBase extends AbstractConstructor<CircuitComponent
 					this.labelDistance.value = new SVG.Number(0.12, "cm")
 				}
 				this.mathJaxLabel.value = saveObject.label.value
-				this.labelColor.value = saveObject.label.color ? new SVG.Color(saveObject.label.color) : null
+				this.labelColor.value = resolveColor(saveObject.label.color, saveObject.label.palette)
 				this.generateLabelRender()
 			}
 		}

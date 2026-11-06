@@ -1,4 +1,5 @@
 import * as SVG from "@svgdotjs/svg.js"
+import { paletteNameOf, resolveColor } from "../utils/palette"
 import {
 	AbstractConstructor,
 	ChoiceEntry,
@@ -15,6 +16,8 @@ import {
 export type StrokeInfo = {
 	width?: SVG.Number
 	color?: string | "default"
+	/** the entry of the palette of the drawing the color comes from */
+	palette?: string
 	opacity?: number
 	style?: string
 }
@@ -60,6 +63,7 @@ export function Strokable<TBase extends AbstractConstructor<CircuitComponent>>(B
 			super(...args)
 			this.strokeInfo = {
 				color: "default",
+				palette: undefined,
 				opacity: 1,
 				width: new SVG.Number("1pt"),
 				style: defaultStrokeStyleChoice.key,
@@ -89,6 +93,7 @@ export function Strokable<TBase extends AbstractConstructor<CircuitComponent>>(B
 
 			this.strokeColorProperty = new ColorProperty("Color", null, undefined, undefined, "stroke:color")
 			this.strokeColorProperty.addChangeListener((ev) => {
+				this.strokeInfo.palette = paletteNameOf(ev.value)
 				if (ev.value == null) {
 					this.strokeInfo.color = "default"
 					this.strokeInfo.opacity = 1
@@ -139,6 +144,9 @@ export function Strokable<TBase extends AbstractConstructor<CircuitComponent>>(B
 			let shouldStroke = false
 			if (this.strokeInfo.color != "default") {
 				stroke.color = this.strokeInfo.color
+				if (this.strokeInfo.palette) {
+					stroke.palette = this.strokeInfo.palette
+				}
 				shouldStroke = true
 			}
 			if (this.strokeInfo.opacity != 1) {
@@ -177,8 +185,11 @@ export function Strokable<TBase extends AbstractConstructor<CircuitComponent>>(B
 
 			if (saveObject.stroke) {
 				if (saveObject.stroke.color) {
-					this.strokeInfo.color = saveObject.stroke.color
-					this.strokeColorProperty.value = new SVG.Color(saveObject.stroke.color)
+					// a color of the palette follows the palette of the file
+					const color = resolveColor(saveObject.stroke.color, saveObject.stroke.palette)
+					this.strokeInfo.color = color.toRgb()
+					this.strokeInfo.palette = paletteNameOf(color)
+					this.strokeColorProperty.value = color
 				}
 				if (saveObject.stroke.opacity != undefined) {
 					this.strokeInfo.opacity = saveObject.stroke.opacity
@@ -211,7 +222,7 @@ export function Strokable<TBase extends AbstractConstructor<CircuitComponent>>(B
 			let width = this.strokeInfo.width.convertToUnit("pt").value
 			if (this.strokeInfo.opacity > 0 && width > 0) {
 				if (this.strokeInfo.color !== "default") {
-					let c = new SVG.Color(this.strokeInfo.color)
+					let c = resolveColor(this.strokeInfo.color, this.strokeInfo.palette)
 					command.options.push("draw=" + c.toTikzString())
 				} else {
 					command.options.push("draw")
