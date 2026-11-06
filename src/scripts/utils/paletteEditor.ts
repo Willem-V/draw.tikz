@@ -27,12 +27,36 @@ export class PaletteEditor {
 			list.innerHTML = ""
 			for (const entry of Palette.instance.entries) {
 				const row = document.createElement("div")
-				row.classList.add("input-group", "input-group-sm")
+				row.classList.add("d-flex", "align-items-center", "gap-2")
 
+				// a big round swatch; the system color picker is an invisible input on top of it
+				const swatch = document.createElement("label")
+				Object.assign(swatch.style, {
+					position: "relative",
+					width: "34px",
+					height: "34px",
+					flex: "none",
+					borderRadius: "50%",
+					border: "1px solid var(--bs-border-color)",
+					boxShadow: "0 0 0 2px var(--bs-body-bg) inset",
+					background: entry.color,
+					cursor: "pointer",
+					overflow: "hidden",
+				})
+				swatch.title = "Change the color"
 				const color = document.createElement("input")
 				color.type = "color"
-				color.classList.add("form-control", "form-control-color", "flex-grow-0")
+				Object.assign(color.style, {
+					position: "absolute",
+					inset: "0",
+					width: "100%",
+					height: "100%",
+					opacity: "0",
+					cursor: "pointer",
+				})
+				swatch.appendChild(color)
 				color.value = entry.color
+				color.addEventListener("input", () => (swatch.style.background = color.value))
 				color.addEventListener("change", () => {
 					Palette.instance.setColor(entry.name, color.value)
 					Undo.addState()
@@ -40,7 +64,7 @@ export class PaletteEditor {
 
 				const name = document.createElement("input")
 				name.type = "text"
-				name.classList.add("form-control")
+				name.classList.add("form-control", "form-control-sm")
 				name.value = entry.name
 				name.title =
 					"Name of the color (exported as the TikZ color dt" + entry.name.replace(/[^A-Za-z]/g, "") + ")"
@@ -55,7 +79,7 @@ export class PaletteEditor {
 
 				const remove = document.createElement("button")
 				remove.type = "button"
-				remove.classList.add("btn", "btn-outline-secondary")
+				remove.classList.add("btn", "btn-sm", "btn-outline-secondary", "border-0")
 				remove.title = "Remove from the palette (components keep the color)"
 				remove.innerHTML = '<span class="material-symbols-outlined" style="font-size:1rem">close</span>'
 				remove.addEventListener("click", () => {
@@ -65,7 +89,7 @@ export class PaletteEditor {
 
 				const select = document.createElement("button")
 				select.type = "button"
-				select.classList.add("btn", "btn-outline-secondary")
+				select.classList.add("btn", "btn-sm", "btn-outline-secondary", "border-0")
 				select.title = "Select all components which use this color"
 				select.innerHTML = '<span class="material-symbols-outlined" style="font-size:1rem">select_all</span>'
 				select.addEventListener("click", () => {
@@ -82,7 +106,7 @@ export class PaletteEditor {
 					SelectionController.instance.selectComponents(used, SelectionMode.RESET)
 				})
 
-				row.append(color, name, select, remove)
+				row.append(swatch, name, select, remove)
 				list.appendChild(row)
 			}
 
