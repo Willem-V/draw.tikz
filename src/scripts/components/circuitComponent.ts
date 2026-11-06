@@ -33,6 +33,10 @@ type Constructor<T = {}> = new (...args: any[]) => T
 export type ComponentSaveObject = {
 	type: string
 	selected?: boolean
+	/** not shown and not exported */
+	hidden?: boolean
+	/** cannot be selected */
+	locked?: boolean
 }
 
 /**
@@ -58,6 +62,27 @@ export abstract class CircuitComponent {
 	 * the name of the component (e.g. "Resistor", "Wire" or "Transformer")
 	 */
 	public displayName: string
+
+	/** the component is not shown and not exported (layers) */
+	public hidden = false
+	/** the component cannot be selected by clicking or with the selection rectangle (layers) */
+	public locked = false
+
+	public setHidden(hidden: boolean) {
+		this.hidden = hidden
+		if (hidden) {
+			this.isSelected = false
+		}
+		this.visualization.node.style.display = hidden ? "none" : ""
+	}
+
+	public setLocked(locked: boolean) {
+		this.locked = locked
+		if (locked) {
+			this.isSelected = false
+		}
+		this.visualization.node.style.pointerEvents = locked ? "none" : ""
+	}
 
 	/**
 	 * For keeping track of the parent group of this component if one exists.
@@ -304,6 +329,8 @@ export abstract class CircuitComponent {
 		let saveObject: ComponentSaveObject = {
 			type: "component",
 		}
+		if (this.hidden) saveObject.hidden = true
+		if (this.locked) saveObject.locked = true
 		return saveObject
 	}
 	/**
@@ -346,6 +373,8 @@ export abstract class CircuitComponent {
 		SnapCursorController.instance.visible = false
 		this.finishedPlacing = true
 		this.draggable(true)
+		if (saveObject.hidden) this.setHidden(true)
+		if (saveObject.locked) this.setLocked(true)
 	}
 
 	protected static jsonSaveMap: Map<string, Constructor<CircuitComponent>> = new Map()

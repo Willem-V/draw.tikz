@@ -1,4 +1,5 @@
 import { Palette } from "../utils/palette"
+import { PageFrame } from "../utils/pageFrame"
 import { Modal, Tooltip } from "bootstrap"
 import {
 	SelectionController,
@@ -140,6 +141,7 @@ export class ExportController {
 		let circuitElements = []
 		let requiredTikzLibraries: Set<string> = new Set<string>()
 		for (const circuitElement of MainController.instance.circuitComponents) {
+			if (circuitElement.hidden) continue
 			circuitElement.requiredTikzLibraries().forEach((item) => requiredTikzLibraries.add(item))
 			circuitElements.push("\t" + circuitElement.toTikzString())
 		}
@@ -155,6 +157,7 @@ export class ExportController {
 			"\\begin{tikzpicture}" + "[" + ["transform shape"].concat(tikzSettings.environment).join(", ") + "]",
 			...tikzSettings.ctikzset.map((setting) => "\t\\ctikzset{" + setting + "}"),
 			...colorDefinitions.map((definition) => "\t" + definition),
+			...(PageFrame.instance.tikzBoundingBox() ? ["\t" + PageFrame.instance.tikzBoundingBox()] : []),
 			"\t% Paths, nodes and wires:",
 			...circuitElements,
 			"\\end{tikzpicture}",
@@ -201,6 +204,7 @@ export class ExportController {
 		let defsMap: Map<string, SVG.Element> = new Map<string, SVG.Element>()
 		let components: SVG.Element[] = []
 		for (const instance of MainController.instance.circuitComponents) {
+			if (instance.hidden) continue
 			components.push(instance.toSVG(defsMap))
 		}
 
@@ -232,7 +236,13 @@ export class ExportController {
 
 		// bounding box to include all elements
 		let bbox = svgObj.bbox()
-		if (bbox) {
+		const pageRect = PageFrame.instance.rect()
+		if (pageRect) {
+			// the page frame is the picture, everything outside is cut off
+			svgObj.node.style.overflow = "hidden"
+			svgObj.viewbox(pageRect)
+			svgObj.size(pageRect.w, pageRect.h)
+		} else if (bbox) {
 			//make bbox 2px larger in every direction to not cut of tiny bits of some objects
 			bbox.x -= 2
 			bbox.y -= 2

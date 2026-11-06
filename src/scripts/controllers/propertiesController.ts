@@ -1,3 +1,5 @@
+import { PageEditor } from "../utils/pageFrame"
+import { LayersEditor } from "../utils/layersEditor"
 import { PaletteEditor } from "../utils/paletteEditor"
 import {
 	AlignmentMode,
@@ -279,6 +281,15 @@ export class PropertyController {
 			document.getElementById("view-properties").appendChild(PaletteEditor.createHTML())
 			SectionHeaderProperty.applyCollapsed(document.getElementById("paletteEditor"))
 		}
+		if (!document.getElementById("pageEditor")) {
+			document.getElementById("view-properties").appendChild(PageEditor.createHTML())
+			SectionHeaderProperty.applyCollapsed(document.getElementById("pageEditor"))
+		}
+		if (!document.getElementById("layersEditor")) {
+			document.getElementById("view-properties").appendChild(LayersEditor.createHTML())
+			SectionHeaderProperty.applyCollapsed(document.getElementById("layersEditor"))
+		}
+		LayersEditor.refresh()
 	}
 
 	private clearForm() {
