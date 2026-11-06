@@ -3,6 +3,16 @@ import { EditableProperty } from "./editableProperty"
 import { Undo } from "../internal"
 import { Palette, PaletteChange, PaletteColor, PaletteUser } from "../utils/palette"
 
+/** the last custom colors, shared by all color fields */
+const recentColors: string[] = []
+function rememberRecentColor(hex: string) {
+	const color = hex.toLowerCase()
+	const index = recentColors.indexOf(color)
+	if (index >= 0) recentColors.splice(index, 1)
+	recentColors.unshift(color)
+	recentColors.splice(12)
+}
+
 export class ColorProperty extends EditableProperty<SVG.Color | null> implements PaletteUser {
 	private label: string
 	private input: HTMLInputElement
@@ -95,8 +105,9 @@ export class ColorProperty extends EditableProperty<SVG.Color | null> implements
 				col.appendChild(enablerDiv)
 			}
 
+			// the native picker is only used for "Custom...", the visible control is the swatch button below
 			this.input = document.createElement("input") as HTMLInputElement
-			this.input.classList.add("form-control", "form-control-color")
+			this.input.classList.add("d-none")
 			this.input.value = this.value ? this.value.toString() : ""
 			this.input.setAttribute("type", "color")
 
@@ -108,16 +119,39 @@ export class ColorProperty extends EditableProperty<SVG.Color | null> implements
 				}
 			})
 			this.input.addEventListener("change", (ev) => {
+				rememberRecentColor(this.input.value)
 				Undo.addState()
 			})
-
 			col.appendChild(this.input)
 
-			// the colors of the palette of the drawing
+			// a big swatch with the name of the color, which opens the palette
 			this.paletteButton = document.createElement("button") as HTMLButtonElement
 			this.paletteButton.type = "button"
-			this.paletteButton.classList.add("btn", "btn-outline-secondary", "material-symbols-outlined", "px-2")
-			this.paletteButton.innerText = "palette"
+			this.paletteButton.classList.add(
+				"btn",
+				"btn-outline-secondary",
+				"d-flex",
+				"align-items-center",
+				"gap-2",
+				"text-start"
+			)
+			this.paletteButton.style.flex = "1 1 auto"
+			this.swatchElement = document.createElement("span")
+			Object.assign(this.swatchElement.style, {
+				display: "inline-block",
+				width: "2.4rem",
+				height: "1.5rem",
+				borderRadius: "4px",
+				border: "2px solid var(--bs-body-color)",
+				flex: "none",
+			})
+			this.swatchName = document.createElement("span")
+			this.swatchName.classList.add("flex-grow-1", "text-truncate")
+			const chevron = document.createElement("span")
+			chevron.classList.add("material-symbols-outlined")
+			chevron.style.fontSize = "1.2rem"
+			chevron.textContent = "expand_more"
+			this.paletteButton.append(this.swatchElement, this.swatchName, chevron)
 			this.paletteButton.addEventListener("click", (ev) => {
 				ev.stopPropagation()
 				this.togglePalettePopup()
@@ -129,18 +163,25 @@ export class ColorProperty extends EditableProperty<SVG.Color | null> implements
 		return row
 	}
 
-	/** the button shows the color of the palette which is used */
+	private swatchElement: HTMLSpanElement
+	private swatchName: HTMLSpanElement
+
+	/** the swatch shows the color (struck through for no color) and its name */
 	private updatePaletteButton() {
 		if (!this.paletteButton) {
 			return
 		}
 		const value = this.value
-		if (value instanceof PaletteColor) {
-			this.paletteButton.title = `Palette color "${value.paletteName}"`
-			this.paletteButton.classList.add("active")
+		if (value) {
+			this.swatchElement.style.background = value.toHex()
+			this.swatchName.textContent = value instanceof PaletteColor ? value.paletteName : value.toHex()
+			this.paletteButton.title =
+				value instanceof PaletteColor ? `Palette color "${value.paletteName}"` : "Custom color"
 		} else {
-			this.paletteButton.title = "Choose a color of the palette"
-			this.paletteButton.classList.remove("active")
+			this.swatchElement.style.background =
+				"linear-gradient(to top right, transparent calc(50% - 1px), var(--bs-danger) 50%, transparent calc(50% + 1px)), var(--bs-body-bg)"
+			this.swatchName.textContent = "default"
+			this.paletteButton.title = "Default color of the theme"
 		}
 	}
 
@@ -150,41 +191,102 @@ export class ColorProperty extends EditableProperty<SVG.Color | null> implements
 			return
 		}
 		const popup = document.createElement("div")
-		popup.classList.add("border", "rounded", "bg-body", "shadow", "p-2")
-		Object.assign(popup.style, {
-			position: "fixed",
-			zIndex: "3000",
-			display: "grid",
-			gridTemplateColumns: "repeat(4, 28px)",
-			gap: "6px",
-		})
-		for (const entry of Palette.instance.entries) {
-			const swatch = document.createElement("button")
-			swatch.type = "button"
-			swatch.title = entry.name
-			Object.assign(swatch.style, {
-				width: "28px",
-				height: "28px",
-				borderRadius: "4px",
-				border: "1px solid var(--bs-border-color)",
-				background: entry.color,
-			})
-			swatch.addEventListener("click", () => {
-				const color = Palette.instance.getColor(entry.name)
-				this.closePalettePopup()
-				this.updateValue(color, true)
-				Undo.addState()
-			})
-			popup.appendChild(swatch)
+		popup.classList.add("border", "rounded", "bg-body", "shadow", "p-2", "d-flex", "flex-column", "gap-2")
+		Object.assign(popup.style, { position: "fixed", zIndex: "3000", width: "272px" })
+
+		const grid = (colors: { name: string; color: string; palette: boolean }[], title: string) => {
+			if (colors.length == 0) return
+			const caption = document.createElement("div")
+			caption.classList.add("small", "text-body-secondary")
+			caption.textContent = title
+			popup.appendChild(caption)
+			const wrapper = document.createElement("div")
+			Object.assign(wrapper.style, { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "8px" })
+			for (const entry of colors) {
+				const swatch = document.createElement("button")
+				swatch.type = "button"
+				swatch.title = entry.name
+				const selected =
+					this.value &&
+					(entry.palette ?
+						this.value instanceof PaletteColor && this.value.paletteName == entry.name
+					:	!(this.value instanceof PaletteColor) && this.value.toHex() == entry.color)
+				Object.assign(swatch.style, {
+					height: "34px",
+					borderRadius: "6px",
+					border: selected ? "3px solid var(--bs-primary)" : "1px solid var(--bs-border-color)",
+					boxShadow: selected ? "0 0 0 1px var(--bs-body-bg) inset" : "",
+					background: entry.color,
+				})
+				swatch.addEventListener("click", () => {
+					this.closePalettePopup()
+					if (this.nullable && this.enabler) this.enabler.checked = true
+					const color =
+						entry.palette ? Palette.instance.getColor(entry.name) : new SVG.Color(entry.color, "rgb")
+					this.updateValue(color, true)
+					if (!entry.palette) rememberRecentColor(entry.color)
+					Undo.addState()
+				})
+				wrapper.appendChild(swatch)
+			}
+			popup.appendChild(wrapper)
 		}
+		grid(
+			Palette.instance.entries.map((entry) => ({ name: entry.name, color: entry.color, palette: true })),
+			"Palette"
+		)
+		grid(
+			recentColors.map((color) => ({ name: color, color, palette: false })),
+			"Recent"
+		)
+
+		const custom = document.createElement("div")
+		custom.classList.add("input-group", "input-group-sm")
+		const hex = document.createElement("input")
+		hex.type = "text"
+		hex.classList.add("form-control")
+		hex.placeholder = "#rrggbb"
+		hex.value = this.value ? this.value.toHex() : ""
+		const apply = () => {
+			const text = hex.value.trim()
+			if (/^#?[0-9a-fA-F]{6}$/.test(text)) {
+				const color = new SVG.Color(text.startsWith("#") ? text : "#" + text)
+				this.closePalettePopup()
+				if (this.nullable && this.enabler) this.enabler.checked = true
+				this.updateValue(color, true)
+				rememberRecentColor(color.toHex())
+				Undo.addState()
+			} else {
+				hex.classList.add("is-invalid")
+			}
+		}
+		hex.addEventListener("keydown", (ev) => {
+			ev.stopPropagation()
+			if (ev.key == "Enter") apply()
+		})
+		const pick = document.createElement("button")
+		pick.type = "button"
+		pick.classList.add("btn", "btn-outline-secondary")
+		pick.textContent = "Pick..."
+		pick.title = "Choose any color with the color picker"
+		pick.addEventListener("click", () => {
+			this.closePalettePopup()
+			if (this.nullable && this.enabler) this.enabler.checked = true
+			this.input.click()
+		})
+		custom.append(hex, pick)
+		popup.appendChild(custom)
+
 		const rect = this.paletteButton.getBoundingClientRect()
-		popup.style.left = `${Math.max(4, rect.right - 4 * 34 - 16)}px`
+		popup.style.left = `${Math.max(4, Math.min(window.innerWidth - 280, rect.right - 272))}px`
 		popup.style.top = `${rect.bottom + 4}px`
 		document.body.appendChild(popup)
 		this.palettePopup = popup
 		const outside = (ev: MouseEvent) => {
 			if (!popup.contains(ev.target as Node)) {
 				this.closePalettePopup()
+			} else {
+				document.addEventListener("click", outside, { once: true })
 			}
 		}
 		// registered after the current click, so it doesn't close the popup right away
@@ -198,6 +300,7 @@ export class ColorProperty extends EditableProperty<SVG.Color | null> implements
 
 	protected disable(disabled = true): void {
 		this.input.disabled = disabled
+		if (this.paletteButton) this.paletteButton.disabled = disabled
 		this.enabler.disabled = disabled
 	}
 
