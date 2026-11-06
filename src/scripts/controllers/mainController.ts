@@ -30,6 +30,8 @@ import {
 	ComponentSymbol,
 	ComponentSaveObject,
 	RectangleComponent,
+	BezierComponent,
+	ArcComponent,
 	TableComponent,
 	EllipseComponent,
 	defaultStroke,
@@ -1172,6 +1174,53 @@ export class MainController {
 			svgIcon.line(1, 5, 16, 5).stroke(stroke)
 			svgIcon.line(6, 1, 6, 11).stroke(stroke)
 			svgIcon.line(11, 1, 11, 11).stroke(stroke)
+		}
+		//Add curves, arcs
+		for (const entry of [
+			{
+				title: "Curve",
+				search: "curve bezier spline path smooth",
+				create: () => new BezierComponent(),
+				icon: (svgIcon: SVG.Svg) =>
+					svgIcon.path("M 1 10 C 5 -4, 10 18, 16 2").fill("none").stroke({ color: defaultStroke, width: 1 }),
+			},
+			{
+				title: "Free-hand curve",
+				search: "free hand freehand draw pencil curve sketch",
+				create: () => new BezierComponent(true),
+				icon: (svgIcon: SVG.Svg) =>
+					svgIcon
+						.path("M 1 8 C 3 2, 5 2, 7 7 S 11 12, 16 4")
+						.fill("none")
+						.stroke({ color: defaultStroke, width: 1, dasharray: "2 1.5" }),
+			},
+			{
+				title: "Arc",
+				search: "arc circle segment pie",
+				create: () => new ArcComponent(),
+				icon: (svgIcon: SVG.Svg) =>
+					svgIcon.path("M 15 8 A 6 6 0 0 0 3 4").fill("none").stroke({ color: defaultStroke, width: 1 }),
+			},
+		]) {
+			const addButton: HTMLDivElement = accordionItemBody.appendChild(document.createElement("div"))
+			addButton.classList.add("libComponent")
+			addButton.setAttribute("searchData", entry.search)
+			addButton.ariaRoleDescription = "button"
+			addButton.title = entry.title
+
+			const listener = (ev: MouseEvent) => {
+				ev.preventDefault()
+				this.switchMode(Modes.DRAG_PAN)
+				ComponentPlacer.instance.placeComponent(entry.create())
+				leftOffcanvasOC.hide()
+			}
+
+			addButton.addEventListener("mouseup", listener)
+			addButton.addEventListener("touchstart", listener, { passive: false })
+
+			let svgIcon = SVG.SVG().addTo(addButton)
+			svgIcon.viewbox(0, 0, 17, 12)
+			entry.icon(svgIcon)
 		}
 		//Add Ellipse
 		{
