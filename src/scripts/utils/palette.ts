@@ -154,6 +154,10 @@ export class Palette {
 		this.notify({ type: "reset" })
 	}
 
+	public reset() {
+		this.fromJson(undefined)
+	}
+
 	/** the \definecolor commands of the palette entries which are used in the exported code */
 	public tikzDefinitions(code: string): string[] {
 		return this._entries

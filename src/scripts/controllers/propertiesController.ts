@@ -1,3 +1,4 @@
+import { PaletteEditor } from "../utils/paletteEditor"
 import {
 	AlignmentMode,
 	CanvasController,
@@ -273,6 +274,10 @@ export class PropertyController {
 		if (!document.getElementById("envVarView")) {
 			document.getElementById("view-properties").appendChild(EnvironmentVariableController.instance.getHTML())
 			SectionHeaderProperty.applyCollapsed(EnvironmentVariableController.instance.getHTML())
+		}
+		if (!document.getElementById("paletteEditor")) {
+			document.getElementById("view-properties").appendChild(PaletteEditor.createHTML())
+			SectionHeaderProperty.applyCollapsed(document.getElementById("paletteEditor"))
 		}
 	}
 

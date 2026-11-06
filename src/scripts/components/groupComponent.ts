@@ -1,5 +1,6 @@
 import * as SVG from "@svgdotjs/svg.js"
 import {
+	ColorProperty,
 	IconToolbarProperty,
 	ToolbarGroup,
 	CircuitComponent,
@@ -63,9 +64,48 @@ export class GroupComponent extends CircuitComponent {
 			new IconToolbarProperty(this.toolbarGroups(), "ordering:ungroup")
 		)
 
+		// set a role for all components inside of the group
+		for (const [label, ids] of [
+			["Stroke of all", ["stroke:color"]],
+			["Fill of all", ["fill:color"]],
+			["Text of all", ["label:color", "text:color"]],
+		] as [string, string[]][]) {
+			const property = new ColorProperty(
+				label,
+				null,
+				undefined,
+				"Set this color for everything in the group",
+				"group:" + ids[0]
+			)
+			property.addChangeListener((ev) => {
+				if (ev.value) {
+					this.applyColor(ids, ev.value)
+					Undo.addState()
+				}
+			})
+			this.properties.add(PropertyCategories.stroke, property)
+		}
+
 		this.update()
 		SelectionController.instance.selectComponents([this], SelectionMode.RESET)
 		this.snappingPoints = this.groupedComponents.map((component) => component.snappingPoints).flat()
+	}
+
+	/** set the color of the properties with the ids of all components of the group (also of nested groups) */
+	public applyColor(ids: string[], color: SVG.Color) {
+		for (const component of this.groupedComponents) {
+			if (component instanceof GroupComponent) {
+				component.applyColor(ids, color)
+			}
+			for (const properties of component.properties.values()) {
+				for (const property of properties) {
+					if (ids.includes(property.id) && property instanceof ColorProperty) {
+						property.updateValue(color, true, true)
+					}
+				}
+			}
+			component.update()
+		}
 	}
 
 	/**
