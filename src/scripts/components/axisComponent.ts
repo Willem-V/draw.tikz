@@ -28,8 +28,7 @@ import {
 import { cellToLatex } from "../utils/latexText"
 import { Palette, paletteNameOf, resolveColor } from "../utils/palette"
 import { compileExpression } from "../utils/expression"
-import { bezierPathData, simplifyPolyline, smoothPath } from "../utils/curves"
-import { HintBar } from "../utils/hintBar"
+import { bezierPathData, smoothPath } from "../utils/curves"
 import {
 	AxisSettings,
 	axisFraction,
@@ -129,7 +128,7 @@ const seriesPaletteOrder = [5, 6, 3, 1, 7, 2, 4, 0]
 
 /**
  * An axis with plots, drawn like a figure from a paper: axes with ticks, grid, labels with units, title, legend and data
- * series (formula, pasted table or drawn free-hand). The size is the plot area; the numbers on the axes follow from the ranges.
+ * series (formula or pasted table). The size is the plot area; the numbers on the axes follow from the ranges.
  * Everything is drawn from the same layout in the preview and in the exported TikZ (plain lines, nodes and coordinates), so
  * pgfplots is not needed and the PDF looks like the preview.
  */
@@ -342,24 +341,21 @@ export class AxisComponent extends ShapeComponent {
 		this.properties.add(
 			category,
 			new ButtonGridProperty(
-				2,
+				3,
 				[
 					["Formula", "add"],
 					["Table", "add"],
-					["Free-hand", "draw"],
 					["Remove", "delete"],
 				],
 				[
 					() => this.addSeries(newSeries("formula")),
 					() => this.addSeries(newSeries("table")),
-					() => this.startFreehand(),
 					() => this.removeSeries(),
 				],
 				false,
 				[
 					"Add a plot of a formula of x",
 					"Add a plot of a table of points (paste columns from a spreadsheet)",
-					"Draw a curve with the mouse on the axis, which becomes a table of points",
 					"Remove the selected plot",
 				]
 			)
@@ -586,89 +582,6 @@ export class AxisComponent extends ShapeComponent {
 		this.loadSeries()
 		this.update()
 		Undo.addState()
-	}
-
-	// ------------------------------------------------------------------ free-hand drawing
-
-	private startFreehand() {
-		const canvasNode = CanvasController.instance.canvas.node
-		const topLeft = () => this.position.sub(this.size.div(2))
-		const local = (ev: MouseEvent | PointerEvent) => CanvasController.eventToPoint(ev, false).sub(topLeft())
-		const inside = (p: SVG.Point) => p.x >= 0 && p.y >= 0 && p.x <= this.size.x && p.y <= this.size.y
-		let recording: SVG.Point[] | undefined
-		const preview = CanvasController.instance.canvas
-			.path()
-			.fill("none")
-			.stroke({ color: "var(--bs-cyan)", width: 2 })
-		preview.node.style.pointerEvents = "none"
-
-		const stop = () => {
-			canvasNode.removeEventListener("pointerdown", down, true)
-			canvasNode.removeEventListener("mousedown", swallow, true)
-			canvasNode.removeEventListener("pointermove", move, true)
-			canvasNode.removeEventListener("pointerup", up, true)
-			document.removeEventListener("keydown", key, true)
-			canvasNode.style.cursor = ""
-			preview.remove()
-			HintBar.clear()
-		}
-		const down = (ev: PointerEvent) => {
-			const p = local(ev)
-			if (!inside(p)) return
-			ev.stopPropagation()
-			ev.preventDefault()
-			recording = [p]
-		}
-		const swallow = (ev: MouseEvent) => {
-			if (inside(local(ev))) {
-				ev.stopPropagation()
-				ev.preventDefault()
-			}
-		}
-		const move = (ev: PointerEvent) => {
-			if (!recording) return
-			ev.stopPropagation()
-			const p = local(ev)
-			if (p.sub(recording.at(-1)).abs() >= 2) recording.push(p)
-			const o = topLeft()
-			preview.plot("M " + recording.map((q) => `${q.x + o.x} ${q.y + o.y}`).join(" L "))
-		}
-		const up = (ev: PointerEvent) => {
-			if (!recording) return
-			ev.stopPropagation()
-			const points = simplifyPolyline(recording, 1.2)
-			stop()
-			if (points.length >= 2) {
-				const lines = points.map((p) => {
-					const fx = p.x / this.size.x
-					const fy = 1 - p.y / this.size.y
-					const a = this.eff
-					const x = a.xLog ? a.xMin * Math.pow(a.xMax / a.xMin, fx) : a.xMin + fx * (a.xMax - a.xMin)
-					const y = a.yLog ? a.yMin * Math.pow(a.yMax / a.yMin, fy) : a.yMin + fy * (a.yMax - a.yMin)
-					return `${Number(x.toPrecision(4))} ${Number(y.toPrecision(4))}`
-				})
-				const series = newSeries("table")
-				series.table = lines.join("\n")
-				series.smooth = points.length <= 40
-				this.addSeries(series)
-			}
-		}
-		const key = (ev: KeyboardEvent) => {
-			if (ev.key == "Escape") {
-				ev.stopPropagation()
-				stop()
-			}
-		}
-		canvasNode.addEventListener("pointerdown", down, true)
-		canvasNode.addEventListener("mousedown", swallow, true)
-		canvasNode.addEventListener("pointermove", move, true)
-		canvasNode.addEventListener("pointerup", up, true)
-		document.addEventListener("keydown", key, true)
-		canvasNode.style.cursor = "crosshair"
-		HintBar.show("Free-hand series", "", [
-			{ key: "Drag", action: "draw the curve on the axis" },
-			{ key: "Esc", action: "cancel" },
-		])
 	}
 
 	// ------------------------------------------------------------------ layout
@@ -1092,15 +1005,6 @@ export class AxisComponent extends ShapeComponent {
 	public copyForPlacement(): CircuitComponent {
 		const copy = new AxisComponent()
 		return copy
-	}
-
-	public placeFinish(): void {
-		const wasFinished = this.finishedPlacing
-		super.placeFinish()
-		if (!wasFinished && this.series.length == 0) {
-			// a first example, so there is something to see
-			this.addSeriesQuiet(newSeries("formula"))
-		}
 	}
 
 	private addSeriesQuiet(series: Series) {
