@@ -193,8 +193,9 @@ export function axisTicks(axis: AxisSettings, which: "x" | "y"): AxisTicks {
 	const max = which == "x" ? axis.xMax : axis.yMax
 	const log = which == "x" ? axis.xLog : axis.yLog
 	const custom = which == "x" ? axis.xTicks : axis.yTicks
-	const stepSetting = which == "x" ? axis.xStep : axis.yStep
-	const minorCount = which == "x" ? axis.xMinor : axis.yMinor
+	// a negative step or count makes no sense (it is 0: automatic, or none)
+	const stepSetting = Math.max(0, (which == "x" ? axis.xStep : axis.yStep) || 0)
+	const minorCount = Math.max(0, (which == "x" ? axis.xMinor : axis.yMinor) || 0)
 	if (!(max > min)) return { major: [], minor: [] }
 
 	if (custom.trim()) {

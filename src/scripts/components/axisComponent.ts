@@ -287,8 +287,24 @@ export class AxisComponent extends ShapeComponent {
 			(key) => (key == "log") as any,
 			(value) => (value ? "log" : "linear")
 		)
-		this.number("Major step", "xStep", 1, "Distance of the numbers, 0 is automatic")
-		this.number("Minor ticks", "xMinor", 1, "Number of minor ticks between the major ticks")
+		this.number(
+			"Major step",
+			"xStep",
+			1,
+			"Distance of the numbers, 0 is automatic",
+			undefined,
+			PropertyCategories.options,
+			[0, 1e9]
+		)
+		this.number(
+			"Minor ticks",
+			"xMinor",
+			1,
+			"Number of minor ticks between the major ticks",
+			undefined,
+			PropertyCategories.options,
+			[0, 20]
+		)
 		this.text("Ticks", "xTicks", "Own ticks, e.g. 0, 0.5, 1 or 0:low, 1:high. Empty: automatic")
 		this.text("Label", "xLabel", "Label of the axis, $math$ is possible")
 		this.text("Unit", "xUnit", "Shown in brackets behind the label, e.g. ms or $\\mu$s")
@@ -303,8 +319,24 @@ export class AxisComponent extends ShapeComponent {
 			(key) => (key == "log") as any,
 			(value) => (value ? "log" : "linear")
 		)
-		this.number("Major step", "yStep", 1, "Distance of the numbers, 0 is automatic")
-		this.number("Minor ticks", "yMinor", 1, "Number of minor ticks between the major ticks")
+		this.number(
+			"Major step",
+			"yStep",
+			1,
+			"Distance of the numbers, 0 is automatic",
+			undefined,
+			PropertyCategories.options,
+			[0, 1e9]
+		)
+		this.number(
+			"Minor ticks",
+			"yMinor",
+			1,
+			"Number of minor ticks between the major ticks",
+			undefined,
+			PropertyCategories.options,
+			[0, 20]
+		)
 		this.text("Ticks", "yTicks", "Own ticks, e.g. 0, 0.5, 1 or 0:low, 1:high. Empty: automatic")
 		this.text("Label", "yLabel", "Label of the axis, $math$ is possible")
 		this.text("Unit", "yUnit", "Shown in brackets behind the label")
