@@ -1,5 +1,6 @@
 import * as SVG from "@svgdotjs/svg.js"
 import {
+	ColumnAlignProperty,
 	basicDirections,
 	BooleanProperty,
 	buildTikzStringFromNodeCommand,
@@ -41,6 +42,8 @@ export type TableSaveObject = ShapeSaveObject & {
 	innerVertical?: boolean
 	headerLine?: boolean
 	align?: TextAlign
+	/** one letter per column: l, c, r or - (like align) */
+	columnAlign?: string
 	fontSize?: string
 	innerSep?: string
 	textColor?: string
@@ -79,6 +82,7 @@ export class TableComponent extends ShapeComponent {
 	private horizontalProperty: BooleanProperty
 	private verticalProperty: BooleanProperty
 	private headerProperty: BooleanProperty
+	private columnAlignProperty: ColumnAlignProperty
 	private alignProperty: RadioButtonProperty<{ key: string; name: string; isMaterialSymbol: boolean; numberID: any }>
 	private fontSizeProperty: ChoiceProperty<FontSize>
 	private innerSepProperty: SliderProperty
@@ -140,6 +144,10 @@ export class TableComponent extends ShapeComponent {
 		this.alignProperty = new RadioButtonProperty("Align", alignOptions, alignOptions[1], undefined, "table:align")
 		this.alignProperty.addChangeListener(() => this.update())
 		this.properties.add(PropertyCategories.text, this.alignProperty)
+		this.columnAlignProperty = new ColumnAlignProperty("", "Alignment of single columns", "table:column-align")
+		this.columnAlignProperty.setColumns(parseTableContent(defaultContent)[0].length)
+		this.columnAlignProperty.addChangeListener(() => this.update())
+		this.properties.add(PropertyCategories.text, this.columnAlignProperty)
 
 		this.fontSizeProperty = new ChoiceProperty("Fontsize", fontSizes, defaultFontSize, undefined, "text:fontsize")
 		this.fontSizeProperty.addChangeListener(() => this.update())
@@ -163,6 +171,15 @@ export class TableComponent extends ShapeComponent {
 		this.properties.add(PropertyCategories.text, this.textColorProperty)
 
 		this.selectionElement = CanvasController.instance.canvas.rect(0, 0).hide()
+	}
+
+	/** the alignment of a column: its own, or that of the whole table */
+	private alignOfColumn(column: number): TextAlign {
+		const letter = (this.columnAlignProperty.value ?? "")[column]
+		if (letter == "l") return TextAlign.LEFT
+		if (letter == "c") return TextAlign.CENTER
+		if (letter == "r") return TextAlign.RIGHT
+		return this.alignProperty.value.numberID as TextAlign
 	}
 
 	private get cells(): string[][] {
@@ -193,6 +210,7 @@ export class TableComponent extends ShapeComponent {
 
 	public update(): void {
 		super.update()
+		this.columnAlignProperty?.setColumns(this.cells[0].length)
 		const matrix = this.getTransformMatrix()
 		const path = (header: boolean) =>
 			this.innerLines()
@@ -247,7 +265,7 @@ export class TableComponent extends ShapeComponent {
 					convertTextToNativeSVGText(
 						{
 							text: text,
-							align: this.alignProperty.value.numberID,
+							align: this.alignOfColumn(column),
 							justify: 0,
 							fontSize: this.fontSizeProperty.value.key,
 							color: color,
@@ -299,6 +317,7 @@ export class TableComponent extends ShapeComponent {
 		if (!this.horizontalProperty.value) data.innerHorizontal = false
 		if (!this.verticalProperty.value) data.innerVertical = false
 		if (!this.headerProperty.value) data.headerLine = false
+		if (this.columnAlignProperty.value) data.columnAlign = this.columnAlignProperty.value
 		if (this.alignProperty.value.numberID !== TextAlign.CENTER) data.align = this.alignProperty.value.numberID
 		if (this.fontSizeProperty.value.key !== defaultFontSize.key) data.fontSize = this.fontSizeProperty.value.key
 		if (this.innerSepProperty.value.value !== 3) data.innerSep = this.innerSepProperty.value.toString()
@@ -316,6 +335,7 @@ export class TableComponent extends ShapeComponent {
 		this.horizontalProperty.value = saveObject.innerHorizontal ?? true
 		this.verticalProperty.value = saveObject.innerVertical ?? true
 		this.headerProperty.value = saveObject.headerLine ?? true
+		this.columnAlignProperty.value = saveObject.columnAlign ?? ""
 		const align = saveObject.align ?? TextAlign.CENTER
 		this.alignProperty.value =
 			Object.values(this.alignProperty.options).find((item) => item.numberID == align) ??
@@ -376,16 +396,16 @@ export class TableComponent extends ShapeComponent {
 		const padding = this.innerSepProperty.value.convertToUnit("px").value
 		const cellWidth = this.size.x / columns
 		const cellHeight = this.size.y / rows
-		const align = this.alignProperty.value.numberID as TextAlign
-		const anchor =
-			align == TextAlign.LEFT ? "west"
-			: align == TextAlign.RIGHT ? "east"
-			: "center"
 		const fontString =
 			this.fontSizeProperty.value.key == defaultFontSize.key ? "" : `\\${this.fontSizeProperty.value.name} `
 		for (let row = 0; row < rows; row++) {
 			for (let column = 0; column < columns; column++) {
 				if (!cells[row][column]) continue
+				const align = this.alignOfColumn(column)
+				const anchor =
+					align == TextAlign.LEFT ? "west"
+					: align == TextAlign.RIGHT ? "east"
+					: "center"
 				const x =
 					(column +
 						(align == TextAlign.LEFT ? 0

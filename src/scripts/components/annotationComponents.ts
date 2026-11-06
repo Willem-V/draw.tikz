@@ -419,10 +419,10 @@ export class DimensionLineComponent extends AnnotationComponent {
 		this.extensionProperty.addChangeListener(() => this.update())
 		this.properties.add(PropertyCategories.options, this.extensionProperty)
 		this.aboveProperty = new BooleanProperty(
-			"Text above the line",
+			"Text next to the line",
 			false,
 			undefined,
-			"Otherwise the text interrupts the line",
+			"On the outer side of the line, away from the measured points. Otherwise the text interrupts the line",
 			"dim:above"
 		)
 		this.aboveProperty.addChangeListener(() => this.update())
@@ -507,9 +507,9 @@ export class DimensionLineComponent extends AnnotationComponent {
 
 		let label: Label | undefined
 		if (text) {
-			// "up" of the text frame
-			const up = new SVG.Point(Math.sin((angle * Math.PI) / 180), -Math.cos((angle * Math.PI) / 180))
-			const at = this.aboveProperty.value ? mid.add(up.mul(this.fontPx * 0.7 + ptToPx(2))) : mid
+			// next to the line, on the side away from the measured points (where the extension lines are not)
+			const away = n.mul(sign)
+			const at = this.aboveProperty.value ? mid.add(away.mul(this.fontPx * 0.7 + ptToPx(2))) : mid
 			label = { at, text, angle }
 		}
 		return { primitives, label }
