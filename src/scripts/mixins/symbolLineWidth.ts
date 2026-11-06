@@ -1,5 +1,6 @@
 import * as SVG from "@svgdotjs/svg.js"
 import {
+	BooleanProperty,
 	AbstractConstructor,
 	CircuitComponent,
 	ColorProperty,
@@ -29,6 +30,7 @@ const symbolColorVariable = "--bs-emphasis-color"
 export function SymbolLineWidth<TBase extends AbstractConstructor<CircuitComponent>>(Base: TBase) {
 	abstract class SymbolLineWidth extends Base {
 		protected lineWidthProperty: SliderProperty
+		protected lineLockProperty: BooleanProperty
 		/** the color of the whole symbol, null for the color of the theme */
 		protected symbolColorProperty: ColorProperty
 
@@ -53,6 +55,14 @@ export function SymbolLineWidth<TBase extends AbstractConstructor<CircuitCompone
 				this.update()
 			})
 			this.properties.add(PropertyCategories.stroke, this.lineWidthProperty)
+			this.lineLockProperty = new BooleanProperty(
+				"Lock line width",
+				false,
+				undefined,
+				"Keep this width when the line width of everything is changed",
+				"stroke:lock"
+			)
+			this.properties.add(PropertyCategories.stroke, this.lineLockProperty)
 
 			// the symbols draw with the css variable of the default stroke color, so it is replaced on the elements
 			this.symbolColorProperty = new ColorProperty(
@@ -181,14 +191,20 @@ export function SymbolLineWidth<TBase extends AbstractConstructor<CircuitCompone
 				data.lineWidth = this.lineWidthProperty.value.toString()
 			}
 			const color = this.symbolColorProperty.value
-			if (color) {
-				data.stroke = { color: color.toHex(), palette: paletteNameOf(color) }
+			if (color || this.lineLockProperty.value) {
+				data.stroke = {}
+				if (color) {
+					data.stroke.color = color.toHex()
+					data.stroke.palette = paletteNameOf(color)
+				}
+				if (this.lineLockProperty.value) data.stroke.locked = true
 			}
 			return data
 		}
 
 		protected applyJson(saveObject: ComponentSaveObject & { lineWidth?: string; stroke?: StrokeInfo }): void {
 			super.applyJson(saveObject)
+			this.lineLockProperty.value = saveObject.stroke?.locked ?? false
 			this.symbolColorProperty.value = resolveColor(saveObject.stroke?.color, saveObject.stroke?.palette)
 			this.updateSymbolColor()
 			this.lineWidthProperty.value =

@@ -1,6 +1,7 @@
 import * as SVG from "@svgdotjs/svg.js"
 import { paletteNameOf, resolveColor } from "../utils/palette"
 import {
+	BooleanProperty,
 	AbstractConstructor,
 	ChoiceEntry,
 	ChoiceProperty,
@@ -20,6 +21,8 @@ export type StrokeInfo = {
 	palette?: string
 	opacity?: number
 	style?: string
+	/** the line width is not changed by "line width of everything" */
+	locked?: boolean
 }
 export type StrokeStyle = ChoiceEntry & {
 	dasharray: number[]
@@ -57,6 +60,7 @@ export function Strokable<TBase extends AbstractConstructor<CircuitComponent>>(B
 		protected strokeColorProperty: ColorProperty
 		protected strokeOpacityProperty: SliderProperty
 		protected strokeWidthProperty: SliderProperty
+		protected strokeLockProperty: BooleanProperty
 		protected strokeStyleProperty: ChoiceProperty<StrokeStyle>
 
 		constructor(...args: any[]) {
@@ -134,6 +138,17 @@ export function Strokable<TBase extends AbstractConstructor<CircuitComponent>>(B
 			this.properties.add(PropertyCategories.stroke, this.strokeColorProperty)
 			this.properties.add(PropertyCategories.stroke, this.strokeOpacityProperty)
 			this.properties.add(PropertyCategories.stroke, this.strokeWidthProperty)
+			this.strokeLockProperty = new BooleanProperty(
+				"Lock line width",
+				false,
+				undefined,
+				"Keep this width when the line width of everything is changed",
+				"stroke:lock"
+			)
+			this.strokeLockProperty.addChangeListener((ev) => {
+				this.strokeInfo.locked = ev.value
+			})
+			this.properties.add(PropertyCategories.stroke, this.strokeLockProperty)
 			this.properties.add(PropertyCategories.stroke, this.strokeStyleProperty)
 		}
 
@@ -162,6 +177,10 @@ export function Strokable<TBase extends AbstractConstructor<CircuitComponent>>(B
 				stroke.style = this.strokeInfo.style
 				shouldStroke = true
 			}
+			if (this.strokeInfo.locked) {
+				stroke.locked = true
+				shouldStroke = true
+			}
 			if (shouldStroke) {
 				data.stroke = stroke
 			}
@@ -179,6 +198,7 @@ export function Strokable<TBase extends AbstractConstructor<CircuitComponent>>(B
 				style: defaultStrokeStyleChoice.key,
 			}
 			this.strokeWidthProperty.value = this.strokeInfo.width
+			this.strokeLockProperty.value = false
 			this.strokeColorProperty.value = null
 			this.strokeOpacityProperty.value = new SVG.Number(this.strokeInfo.opacity * 100, "%")
 			this.strokeStyleProperty.value = defaultStrokeStyleChoice
@@ -207,6 +227,10 @@ export function Strokable<TBase extends AbstractConstructor<CircuitComponent>>(B
 						this.strokeInfo.width = new SVG.Number(saveObject.stroke.width)
 					}
 					this.strokeWidthProperty.value = this.strokeInfo.width
+				}
+				if (saveObject.stroke.locked) {
+					this.strokeInfo.locked = true
+					this.strokeLockProperty.value = true
 				}
 				if (saveObject.stroke.style) {
 					this.strokeInfo.style = saveObject.stroke.style

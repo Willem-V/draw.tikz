@@ -1,3 +1,4 @@
+import { LineWidthEditor } from "../utils/lineWidthEditor"
 import { PageEditor } from "../utils/pageFrame"
 import { LayersEditor } from "../utils/layersEditor"
 import { PaletteEditor } from "../utils/paletteEditor"
@@ -280,6 +281,10 @@ export class PropertyController {
 		if (!document.getElementById("paletteEditor")) {
 			document.getElementById("view-properties").appendChild(PaletteEditor.createHTML())
 			SectionHeaderProperty.applyCollapsed(document.getElementById("paletteEditor"))
+		}
+		if (!document.getElementById("lineWidthEditor")) {
+			document.getElementById("view-properties").appendChild(LineWidthEditor.createHTML())
+			SectionHeaderProperty.applyCollapsed(document.getElementById("lineWidthEditor"))
 		}
 		if (!document.getElementById("pageEditor")) {
 			document.getElementById("view-properties").appendChild(PageEditor.createHTML())
