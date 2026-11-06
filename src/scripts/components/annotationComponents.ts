@@ -88,9 +88,13 @@ abstract class AnnotationComponent extends Strokable(PathComponent) {
 		return (this.fontSizeProperty.value.size * 4) / 3
 	}
 
+	/** a generous estimate of the width of a text (math counts by its visible characters), so the gap in the line is big enough */
 	protected textWidth(text: string): number {
-		const plain = text.replace(/\$[^$]*\$/g, "xx").replace(/[\\{}^_]/g, "")
-		return plain.length * this.fontPx * 0.55
+		const visible = text
+			.replace(/\\(?:mathrm|mathit|text|textrm|mathbf|left|right|,|;|:|!| )/g, "")
+			.replace(/\\[a-zA-Z]+/g, "x") // other commands (\mu, \Omega, \pm, ...) are one symbol
+			.replace(/[$\\{}^_]/g, "")
+		return visible.length * this.fontPx * 0.62
 	}
 
 	/** the drawing for the current reference points */
@@ -491,7 +495,7 @@ export class DimensionLineComponent extends AnnotationComponent {
 		const a = q1.add(u.mul(inset))
 		const b = q2.sub(u.mul(inset))
 		if (text && !this.aboveProperty.value) {
-			const half = this.textWidth(text) / 2 + ptToPx(2)
+			const half = this.textWidth(text) / 2 + ptToPx(4)
 			const gapStart = mid.sub(along.mul(half))
 			const gapEnd = mid.add(along.mul(half))
 			// the parts of the line before and after the text
