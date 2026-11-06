@@ -15,6 +15,7 @@ import {
 /** pure data of an axis with its plots (see AxisComponent) */
 
 export type AxisStyle = "box" | "cross" | "origin"
+export type TickDirection = "out" | "in" | "through"
 export type GridMode = "none" | "major" | "both"
 export type LegendPosition = "ne" | "nw" | "se" | "sw"
 
@@ -27,7 +28,7 @@ export type AxisSettings = {
 	yLog: boolean
 	style: AxisStyle
 	arrows: boolean
-	ticksIn: boolean
+	tickDirection: TickDirection
 	tickLength: number // pt
 	xStep: number // 0: automatic
 	yStep: number
@@ -56,7 +57,7 @@ export const defaultAxisSettings: AxisSettings = {
 	yLog: false,
 	style: "cross",
 	arrows: false,
-	ticksIn: false,
+	tickDirection: "out",
 	tickLength: 4,
 	xStep: 0,
 	yStep: 0,
@@ -120,6 +121,34 @@ export function newSeries(kind: SeriesKind = "formula"): Series {
 	}
 }
 
+/**
+ * the axis settings with usable limits: a logarithmic axis needs positive limits and every axis needs maximum > minimum. Unusable
+ * limits would give no picture or thousands of ticks.
+ */
+export function normalizeAxis(a: AxisSettings): AxisSettings {
+	const fix = (min: number, max: number, log: boolean): [number, number] => {
+		if (!Number.isFinite(min)) min = log ? 1 : 0
+		if (!Number.isFinite(max)) max = log ? 10 : 1
+		if (log) {
+			if (min <= 0 && max <= 0) {
+				min = 1
+				max = 1000
+			} else if (min <= 0) {
+				min = max / 1000
+			} else if (max <= 0) {
+				max = min * 1000
+			}
+			if (max <= min) max = min * 10
+		} else if (max <= min) {
+			max = min + 1
+		}
+		return [min, max]
+	}
+	const [xMin, xMax] = fix(a.xMin, a.xMax, a.xLog)
+	const [yMin, yMax] = fix(a.yMin, a.yMax, a.yLog)
+	return { ...a, xMin, xMax, yMin, yMax }
+}
+
 /** the data points of a series in runs, the curve is interrupted where a formula has no value */
 export function seriesRuns(series: Series, axis: AxisSettings): [number, number][][] {
 	let points: ([number, number] | null)[] = []
@@ -172,15 +201,21 @@ export function axisTicks(axis: AxisSettings, which: "x" | "y"): AxisTicks {
 		return { major: parseCustomTicks(custom).filter((t) => t.value >= min && t.value <= max), minor: [] }
 	}
 	if (log) {
+		// many decades: only every n-th decade gets a tick
+		const decades = Math.log10(max / min)
+		const every = Math.max(1, Math.ceil(decades / 10))
+		const major = logTicks(min, max).filter((v) => Math.round(Math.log10(v)) % every == 0)
 		return {
-			major: logTicks(min, max).map((value) => ({ value })),
-			minor: minorCount > 0 ? logMinorTicks(min, max) : [],
+			major: major.map((value) => ({ value })),
+			minor: minorCount > 0 && decades <= 6 ? logMinorTicks(min, max) : [],
 		}
 	}
-	const step = stepSetting > 0 ? stepSetting : niceStep(max - min)
+	// a step which would give hundreds of ticks is replaced by an automatic one
+	const step = stepSetting > 0 && (max - min) / stepSetting <= 50 ? stepSetting : niceStep(max - min)
+	const minorCapped = minorCount > 0 && ((max - min) / step) * (minorCount + 1) <= 200 ? minorCount : 0
 	return {
 		major: linearTicks(min, max, step).map((value) => ({ value })),
-		minor: linearMinorTicks(min, max, step, minorCount),
+		minor: linearMinorTicks(min, max, step, minorCapped),
 	}
 }
 

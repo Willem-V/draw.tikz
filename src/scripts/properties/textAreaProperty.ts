@@ -3,8 +3,11 @@ import { CanvasController, EditableProperty, Undo } from "../internal"
 export class TextAreaProperty extends EditableProperty<string> {
 	private input: HTMLTextAreaElement
 
-	public constructor(initalValue?: string, tooltip = "", id: string = "") {
+	private placeholder: string
+
+	public constructor(initalValue?: string, tooltip = "", id: string = "", placeholder = "text component") {
 		super(initalValue, tooltip, id)
+		this.placeholder = placeholder
 	}
 
 	public buildHTML(): HTMLElement {
@@ -16,7 +19,7 @@ export class TextAreaProperty extends EditableProperty<string> {
 			this.input = document.createElement("textArea") as HTMLTextAreaElement
 			this.input.classList.add("form-control")
 			this.input.value = this.value ?? ""
-			this.input.placeholder = "text component"
+			this.input.placeholder = this.placeholder
 			this.input.rows = 5
 			this.input.style.resize = "vertical"
 			inputDiv.appendChild(this.input)

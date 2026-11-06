@@ -12,7 +12,6 @@ import {
 	defaultStroke,
 	FontSize,
 	fontSizes,
-	InfoProperty,
 	PropertyCategories,
 	SectionHeaderProperty,
 	ShapeComponent,
@@ -39,6 +38,8 @@ import {
 	defaultAxisSettings,
 	MarkerKey,
 	newSeries,
+	normalizeAxis,
+	TickDirection,
 	Series,
 	seriesRuns,
 	tickLabel,
@@ -85,9 +86,9 @@ const markerOptions: Record<MarkerKey, { tikz: string; library?: string }> = {
 }
 
 const styleChoices = [
-	{ key: "cross", name: "left and bottom" },
-	{ key: "box", name: "box" },
-	{ key: "origin", name: "through the origin" },
+	{ key: "cross", name: "L shape: left and bottom" },
+	{ key: "box", name: "Box: frame around the plot" },
+	{ key: "origin", name: "Cross: through zero" },
 ]
 const gridChoices = [
 	{ key: "none", name: "off" },
@@ -107,6 +108,7 @@ const scaleChoices = [
 const tickDirectionChoices = [
 	{ key: "out", name: "outside" },
 	{ key: "in", name: "inside" },
+	{ key: "through", name: "through the axis" },
 ]
 const seriesKindChoices = [
 	{ key: "formula", name: "formula y = f(x)" },
@@ -151,8 +153,7 @@ export class AxisComponent extends ShapeComponent {
 	private renderRequested = false
 	private clipId = "axisclip" + Math.random().toString(36).slice(2)
 
-	private seriesIndexProperty: SliderProperty
-	private seriesInfoProperty: InfoProperty
+	private seriesChoice: ChoiceProperty<{ key: string; name: string }>
 
 	public constructor() {
 		super()
@@ -183,18 +184,21 @@ export class AxisComponent extends ShapeComponent {
 		step: number,
 		tooltip = "",
 		unit?: string,
-		category = PropertyCategories.options
+		category = PropertyCategories.options,
+		range?: [number, number]
 	) {
 		const property = new SliderProperty(
 			label,
-			-1e9,
-			1e9,
+			range ? range[0] : -1e9,
+			range ? range[1] : 1e9,
 			step,
 			new SVG.Number(this.axis[key] as number, unit),
-			false,
+			range !== undefined,
 			tooltip,
 			"axis:" + key
 		)
+		// without a range the default step of the buttons would be huge
+		property.buttonStep = step
 		property.addChangeListener((ev) => {
 			;(this.axis as any)[key] = ev.value.value
 			this.update()
@@ -245,6 +249,12 @@ export class AxisComponent extends ShapeComponent {
 		const property = new ChoiceProperty(label, options, find(this.axis[key]), undefined, "axis:" + key)
 		property.addChangeListener((ev) => {
 			;(this.axis as any)[key] = toValue(ev.value.key)
+			if (key == "xLog" || key == "yLog") {
+				// a logarithmic axis needs positive limits, which are set to something usable
+				const fixed = normalizeAxis(this.axis)
+				Object.assign(this.axis, { xMin: fixed.xMin, xMax: fixed.xMax, yMin: fixed.yMin, yMax: fixed.yMax })
+				this.loaders.forEach((load) => load())
+			}
 			this.update()
 		})
 		this.loaders.push(() => (property.value = find(this.axis[key])))
@@ -253,16 +263,18 @@ export class AxisComponent extends ShapeComponent {
 
 	private buildProperties() {
 		this.header("Axes", "axis:header-axes")
-		this.choice("Style", "style", styleChoices)
+		this.choice("Axis lines", "style", styleChoices)
 		this.toggle("Arrow ends", "arrows", "Arrow tips at the end of the axes")
-		this.choice(
-			"Ticks",
-			"ticksIn",
-			tickDirectionChoices,
-			(key) => (key == "in") as any,
-			(value) => (value ? "in" : "out")
+		this.choice("Ticks", "tickDirection", tickDirectionChoices)
+		this.number(
+			"Tick length",
+			"tickLength",
+			0.5,
+			"Length of the major ticks",
+			"pt",
+			PropertyCategories.options,
+			[0, 20]
 		)
-		this.number("Tick length", "tickLength", 0.5, "Length of the major ticks", "pt")
 		this.toggle("Tick labels", "tickLabels")
 		this.choice("Fontsize", "fontSize", fontSizes)
 
@@ -314,32 +326,27 @@ export class AxisComponent extends ShapeComponent {
 	private buildSeriesProperties() {
 		const category = PropertyCategories.options
 		this.header("Series", "axis:header-series")
-		this.seriesInfoProperty = new InfoProperty("Series", "none yet")
-		this.properties.add(category, this.seriesInfoProperty)
-		this.seriesIndexProperty = new SliderProperty(
-			"Selected",
-			1,
-			99,
-			1,
-			new SVG.Number(1),
-			true,
-			"The series which the settings below belong to",
-			"axis:series-index"
+		this.seriesChoice = new ChoiceProperty<{ key: string; name: string }>(
+			"Plot",
+			[{ key: "-1", name: "none yet" }],
+			{ key: "-1", name: "none yet" },
+			"The plot which the settings below belong to",
+			"axis:series"
 		)
-		this.seriesIndexProperty.addChangeListener((ev) => {
-			this.selectedSeries = Math.max(0, Math.min(this.series.length - 1, Math.round(ev.value.value) - 1))
+		this.seriesChoice.addChangeListener((ev) => {
+			this.selectedSeries = Math.max(0, Math.min(this.series.length - 1, Number(ev.value.key)))
 			this.loadSeries()
 		})
-		this.properties.add(category, this.seriesIndexProperty)
+		this.properties.add(category, this.seriesChoice)
 
 		this.properties.add(
 			category,
 			new ButtonGridProperty(
 				2,
 				[
-					["Add formula", "function"],
-					["Add table", "table"],
-					["Draw free-hand", "draw"],
+					["Formula", "add"],
+					["Table", "add"],
+					["Free-hand", "draw"],
 					["Remove", "delete"],
 				],
 				[
@@ -348,12 +355,12 @@ export class AxisComponent extends ShapeComponent {
 					() => this.startFreehand(),
 					() => this.removeSeries(),
 				],
-				true,
+				false,
 				[
 					"Add a plot of a formula of x",
 					"Add a plot of a table of points (paste columns from a spreadsheet)",
 					"Draw a curve with the mouse on the axis, which becomes a table of points",
-					"Remove the selected series",
+					"Remove the selected plot",
 				]
 			)
 		)
@@ -366,12 +373,16 @@ export class AxisComponent extends ShapeComponent {
 				const s = this.current
 				if (s) {
 					apply(s, ev.value)
+					this.refreshSeriesChoice()
 					this.update()
 				}
 			})
 
 		const kind = new ChoiceProperty("Type", seriesKindChoices, seriesKindChoices[0], undefined, "series:kind")
-		series(kind, (s, v: any) => (s.kind = v.key))
+		series(kind, (s, v: any) => {
+			s.kind = v.key
+			this.updateSeriesVisibility()
+		})
 		const expr = new TextProperty(
 			"y =",
 			"",
@@ -404,7 +415,7 @@ export class AxisComponent extends ShapeComponent {
 		)
 		series(to, (s, v: string) => (s.to = v))
 		const samples = new SliderProperty(
-			"Samples",
+			"Points",
 			2,
 			2000,
 			10,
@@ -417,7 +428,8 @@ export class AxisComponent extends ShapeComponent {
 		const table = new TextAreaProperty(
 			"",
 			"One point per line: x and y separated by comma, space or tab",
-			"series:table"
+			"series:table",
+			"0 0\n1 1\n2 4"
 		)
 		series(table, (s, v: string) => (s.table = v))
 		const xColumn = new SliderProperty("X column", 1, 20, 1, new SVG.Number(1), true, undefined, "series:xcol")
@@ -451,7 +463,10 @@ export class AxisComponent extends ShapeComponent {
 		)
 		series(dash, (s, v: any) => (s.dash = v.key))
 		const marker = new ChoiceProperty("Marker", markerChoices, markerChoices[0], undefined, "series:marker")
-		series(marker, (s, v: any) => (s.marker = v.key))
+		series(marker, (s, v: any) => {
+			s.marker = v.key
+			this.updateSeriesVisibility()
+		})
 		const markerSize = new SliderProperty(
 			"Marker size",
 			0.5,
@@ -490,6 +505,10 @@ export class AxisComponent extends ShapeComponent {
 			markerSize.value = new SVG.Number(s.markerSize, "pt")
 			smooth.value = s.smooth
 		}
+		this.formulaProps = [expr, from, to, samples]
+		this.tableProps = [table, xColumn, yColumn]
+		this.commonProps = [kind, label, color, width, dash, marker, smooth]
+		this.markerSizeProp = markerSize
 		for (const property of [
 			kind,
 			expr,
@@ -512,14 +531,37 @@ export class AxisComponent extends ShapeComponent {
 	}
 	private seriesLoaders: () => void = () => {}
 
+	private formulaProps: any[] = []
+	private tableProps: any[] = []
+	private commonProps: any[] = []
+	private markerSizeProp: any
+
+	/** only the settings which belong to the selected plot are shown */
+	private updateSeriesVisibility() {
+		const s = this.current
+		const show = (properties: any[], visible: boolean) =>
+			properties.forEach((p) => p.getHTMLElement().classList.toggle("d-none", !visible))
+		show(this.commonProps, !!s)
+		show(this.formulaProps, !!s && s.kind == "formula")
+		show(this.tableProps, !!s && s.kind == "table")
+		show([this.markerSizeProp], !!s && s.marker != "none")
+	}
+
 	private loadSeries() {
 		this.seriesLoaders()
-		const s = this.current
-		this.seriesInfoProperty.value =
-			s ?
-				`${this.selectedSeries + 1} of ${this.series.length}: ${s.kind == "formula" ? s.expr || "(empty)" : "table"}`
-			:	"none yet"
-		this.seriesIndexProperty.value = new SVG.Number(this.selectedSeries + 1)
+		this.refreshSeriesChoice()
+		this.updateSeriesVisibility()
+	}
+
+	/** the list of the plots with their current names */
+	private refreshSeriesChoice() {
+		const names = this.series.map((s, i) => ({
+			key: String(i),
+			name: `${i + 1}: ${s.label.trim() || (s.kind == "formula" ? "y = " + (s.expr || "?") : "table")}`,
+		}))
+		const entries = names.length > 0 ? names : [{ key: "-1", name: "none yet" }]
+		this.seriesChoice.setEntries(entries)
+		this.seriesChoice.value = entries[names.length > 0 ? this.selectedSeries : 0]
 	}
 
 	private addSeries(series: Series) {
@@ -600,14 +642,9 @@ export class AxisComponent extends ShapeComponent {
 				const lines = points.map((p) => {
 					const fx = p.x / this.size.x
 					const fy = 1 - p.y / this.size.y
-					const x =
-						this.axis.xLog ?
-							this.axis.xMin * Math.pow(this.axis.xMax / this.axis.xMin, fx)
-						:	this.axis.xMin + fx * (this.axis.xMax - this.axis.xMin)
-					const y =
-						this.axis.yLog ?
-							this.axis.yMin * Math.pow(this.axis.yMax / this.axis.yMin, fy)
-						:	this.axis.yMin + fy * (this.axis.yMax - this.axis.yMin)
+					const a = this.eff
+					const x = a.xLog ? a.xMin * Math.pow(a.xMax / a.xMin, fx) : a.xMin + fx * (a.xMax - a.xMin)
+					const y = a.yLog ? a.yMin * Math.pow(a.yMax / a.yMin, fy) : a.yMin + fy * (a.yMax - a.yMin)
 					return `${Number(x.toPrecision(4))} ${Number(y.toPrecision(4))}`
 				})
 				const series = newSeries("table")
@@ -646,15 +683,22 @@ export class AxisComponent extends ShapeComponent {
 		return plain.length * this.fontPx * 0.55
 	}
 
+	/** the settings with usable limits (see normalizeAxis) */
+	private get eff(): AxisSettings {
+		return normalizeAxis(this.axis)
+	}
+
 	private fx(value: number): number {
-		return axisFraction(value, this.axis.xMin, this.axis.xMax, this.axis.xLog) * this.size.x
+		const a = this.eff
+		return axisFraction(value, a.xMin, a.xMax, a.xLog) * this.size.x
 	}
 	private fy(value: number): number {
-		return this.size.y - axisFraction(value, this.axis.yMin, this.axis.yMax, this.axis.yLog) * this.size.y
+		const a = this.eff
+		return this.size.y - axisFraction(value, a.yMin, a.yMax, a.yLog) * this.size.y
 	}
 
 	private layout(): Layout {
-		const a = this.axis
+		const a = this.eff
 		const w = this.size.x
 		const h = this.size.y
 		const tick = ptToPx(a.tickLength)
@@ -669,8 +713,7 @@ export class AxisComponent extends ShapeComponent {
 			gridMinor: [],
 			texts: [],
 		}
-		if (!(a.xMax > a.xMin) || !(a.yMax > a.yMin) || w <= 0 || h <= 0) return layout
-		if ((a.xLog && a.xMin <= 0) || (a.yLog && a.yMin <= 0)) return layout
+		if (w <= 0 || h <= 0) return layout
 
 		// where the axes are
 		const xAxisY = a.style == "origin" && !a.yLog && a.yMin < 0 && a.yMax > 0 ? this.fy(0) : h
@@ -683,7 +726,9 @@ export class AxisComponent extends ShapeComponent {
 				layout.arrowEnds.push({ at: [w, xAxisY], direction: [1, 0] }, { at: [yAxisX, 0], direction: [0, -1] })
 			}
 		}
-		const sign = a.ticksIn ? -1 : 1 // tick direction away from the plot area: down for x, left for y
+		// the ticks reach `outer` away from the plot area (down for x, left for y) and `inner` into it
+		const outer = a.tickDirection == "in" ? 0 : tick
+		const inner = a.tickDirection == "out" ? 0 : tick
 		const xTicks = axisTicks(a, "x")
 		const yTicks = axisTicks(a, "y")
 
@@ -691,32 +736,32 @@ export class AxisComponent extends ShapeComponent {
 		let yLabelLeft = yAxisX - gap
 		for (const t of xTicks.major) {
 			const x = this.fx(t.value)
-			layout.ticks.push({ a: [x, xAxisY], b: [x, xAxisY + sign * tick] })
+			layout.ticks.push({ a: [x, xAxisY - inner], b: [x, xAxisY + outer] })
 			if (a.grid != "none") layout.gridMajor.push({ a: [x, 0], b: [x, h] })
 			if (a.tickLabels) {
 				const text = tickLabel(t, a.xLog)
-				layout.texts.push({ x, y: xAxisY + (a.ticksIn ? 0 : tick) + gap, text, h: 0, v: -1 })
-				xLabelBottom = Math.max(xLabelBottom, xAxisY + (a.ticksIn ? 0 : tick) + gap + font * 1.3)
+				layout.texts.push({ x, y: xAxisY + outer + gap, text, h: 0, v: -1 })
+				xLabelBottom = Math.max(xLabelBottom, xAxisY + outer + gap + font * 1.3)
 			}
 		}
 		for (const value of xTicks.minor) {
 			const x = this.fx(value)
-			layout.minorTicks.push({ a: [x, xAxisY], b: [x, xAxisY + (sign * tick) / 2] })
+			layout.minorTicks.push({ a: [x, xAxisY - inner / 2], b: [x, xAxisY + outer / 2] })
 			if (a.grid == "both") layout.gridMinor.push({ a: [x, 0], b: [x, h] })
 		}
 		for (const t of yTicks.major) {
 			const y = this.fy(t.value)
-			layout.ticks.push({ a: [yAxisX, y], b: [yAxisX - sign * tick, y] })
+			layout.ticks.push({ a: [yAxisX + inner, y], b: [yAxisX - outer, y] })
 			if (a.grid != "none") layout.gridMajor.push({ a: [0, y], b: [w, y] })
 			if (a.tickLabels) {
 				const text = tickLabel(t, a.yLog)
-				layout.texts.push({ x: yAxisX - (a.ticksIn ? 0 : tick) - gap, y, text, h: 1, v: 0 })
-				yLabelLeft = Math.min(yLabelLeft, yAxisX - (a.ticksIn ? 0 : tick) - gap - this.textWidth(text))
+				layout.texts.push({ x: yAxisX - outer - gap, y, text, h: 1, v: 0 })
+				yLabelLeft = Math.min(yLabelLeft, yAxisX - outer - gap - this.textWidth(text))
 			}
 		}
 		for (const value of yTicks.minor) {
 			const y = this.fy(value)
-			layout.minorTicks.push({ a: [yAxisX, y], b: [yAxisX - (sign * tick) / 2, y] })
+			layout.minorTicks.push({ a: [yAxisX + inner / 2, y], b: [yAxisX - outer / 2, y] })
 			if (a.grid == "both") layout.gridMinor.push({ a: [0, y], b: [w, y] })
 		}
 
@@ -760,7 +805,7 @@ export class AxisComponent extends ShapeComponent {
 
 	/** the runs of a series in pixels of the plot area */
 	private seriesPixelRuns(series: Series): SVG.Point[][] {
-		return seriesRuns(series, this.axis).map((run) => run.map(([x, y]) => new SVG.Point(this.fx(x), this.fy(y))))
+		return seriesRuns(series, this.eff).map((run) => run.map(([x, y]) => new SVG.Point(this.fx(x), this.fy(y))))
 	}
 
 	private strokeColorString(): string {
@@ -1030,6 +1075,7 @@ export class AxisComponent extends ShapeComponent {
 	protected applyJson(saveObject: AxisSaveObject): void {
 		super.applyJson(saveObject)
 		this.axis = { ...defaultAxisSettings, ...(saveObject.axis ?? {}) }
+		if ((saveObject.axis as any)?.ticksIn) this.axis.tickDirection = "in"
 		this.series = (saveObject.series ?? []).map((s) => ({ ...newSeries(s.kind), ...s }))
 		this.selectedSeries = 0
 		this.loaders.forEach((load) => load())

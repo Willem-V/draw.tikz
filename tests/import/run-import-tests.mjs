@@ -31,6 +31,7 @@ const diagnosticsMod = await import(`${rootSrc}/import/diagnostics.ts`)
 const parserMod = await import(`${rootSrc}/import/tikzParser.ts`)
 const { compileExpression, sampleFormula } = await import(`${rootSrc}/utils/expression.ts`)
 const ticksMod = await import(`${rootSrc}/utils/ticks.ts`)
+const plotModel = await import(`${rootSrc}/utils/plotModel.ts`)
 const { DiagnosticsCollector } = diagnosticsMod
 const { parseTikz } = parserMod
 
@@ -398,6 +399,20 @@ summary("Plots: ticks and tables")
 	const table = parseTable("x y\n1, 2\n3\t4\n# c\n5 6", 1, 2)
 	assert(JSON.stringify(table) === "[[1,2],[3,4],[5,6]]", "Table skips headers and comments", JSON.stringify(table))
 	assert(JSON.stringify(parseTable("1 2 3\n4 5 6", 1, 3)) === "[[1,3],[4,6]]", "Column choice")
+}
+
+summary("Plots: unusable limits")
+{
+	const { normalizeAxis, axisTicks, defaultAxisSettings } = plotModel
+	const base = { ...defaultAxisSettings }
+	const log = normalizeAxis({ ...base, xLog: true, xMin: 0, xMax: 100 })
+	assert(log.xMin === 0.1, "A logarithmic axis gets a positive minimum", String(log.xMin))
+	const swapped = normalizeAxis({ ...base, yMin: 5, yMax: 1 })
+	assert(swapped.yMax > swapped.yMin, "The maximum is above the minimum")
+	const wide = axisTicks(normalizeAxis({ ...base, xLog: true, xMin: 1e-300, xMax: 1e300 }), "x")
+	assert(wide.major.length <= 12 && wide.minor.length === 0, "Many decades give few ticks", String(wide.major.length))
+	const dense = axisTicks({ ...base, xMin: 0, xMax: 1e6, xStep: 0.001 }, "x")
+	assert(dense.major.length < 60, "A tiny step is replaced", String(dense.major.length))
 }
 
 // --- Done -------------------------------------------------------------------------------- //

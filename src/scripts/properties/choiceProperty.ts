@@ -21,6 +21,22 @@ export class ChoiceProperty<T extends ChoiceEntry> extends EditableProperty<T> {
 		this.label = label
 		this.choiceOptions = choiceOptions
 	}
+	/** replaces the choices, e.g. for a list which changes */
+	public setEntries(options: T[]) {
+		this.choiceOptions = options
+		if (this.selectElement) {
+			this.selectElement.replaceChildren(
+				...options.map((option) => {
+					const element = document.createElement("option")
+					element.value = option.key
+					element.innerHTML = option.name
+					element.selected = this.value ? option.key == this.value.key : false
+					return element
+				})
+			)
+		}
+	}
+
 	public eq(first: T, second: T): boolean {
 		return first.key == second.key
 	}
