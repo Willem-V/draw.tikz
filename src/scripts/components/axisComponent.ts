@@ -19,7 +19,7 @@ import {
 	SliderProperty,
 	SnapPoint,
 	strokeStyleChoices,
-	TextAreaProperty,
+	TableDataProperty,
 	TextProperty,
 	textToSVG,
 	TikzNodeCommand,
@@ -421,11 +421,10 @@ export class AxisComponent extends ShapeComponent {
 			"series:samples"
 		)
 		series(samples, (s, v: SVG.Number) => (s.samples = Math.round(v.value)))
-		const table = new TextAreaProperty(
+		const table = new TableDataProperty(
 			"",
-			"One point per line: x and y separated by comma, space or tab",
-			"series:table",
-			"0 0\n1 1\n2 4"
+			"One point per row. Paste a range from a spreadsheet into any cell, Enter adds a row",
+			"series:table"
 		)
 		series(table, (s, v: string) => (s.table = v))
 		const xColumn = new SliderProperty("X column", 1, 20, 1, new SVG.Number(1), true, undefined, "series:xcol")
@@ -526,6 +525,7 @@ export class AxisComponent extends ShapeComponent {
 		}
 	}
 	private seriesLoaders: () => void = () => {}
+	private seriesSignature = ""
 
 	private formulaProps: any[] = []
 	private tableProps: any[] = []
@@ -556,6 +556,10 @@ export class AxisComponent extends ShapeComponent {
 			name: `${i + 1}: ${s.label.trim() || (s.kind == "formula" ? "y = " + (s.expr || "?") : "table")}`,
 		}))
 		const entries = names.length > 0 ? names : [{ key: "-1", name: "none yet" }]
+		// only when something changed: rebuilding the list while typing would reload the fields
+		const signature = JSON.stringify(entries) + this.selectedSeries
+		if (signature == this.seriesSignature) return
+		this.seriesSignature = signature
 		this.seriesChoice.setEntries(entries)
 		this.seriesChoice.value = entries[names.length > 0 ? this.selectedSeries : 0]
 	}
