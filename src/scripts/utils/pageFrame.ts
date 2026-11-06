@@ -37,7 +37,7 @@ export class PageFrame {
 
 	public page: PageSettings = { enabled: false, width: 8.5, height: 6, x: 0, y: 0 }
 	public guides: Guide[] = []
-	/** hidden guides are not drawn and components do not snap to them */
+	/** guides are only shown, components do not snap to them */
 	public guidesVisible = true
 
 	private frameElement: SVG.Rect | undefined
@@ -56,7 +56,6 @@ export class PageFrame {
 
 	/** the positions of the guides in px: vertical ones as x, horizontal ones as y (canvas coordinates) */
 	public guidePositions(): { x: number[]; y: number[] } {
-		if (!this.guidesVisible) return { x: [], y: [] }
 		return {
 			x: this.guides.filter((g) => g.orientation == "v").map((g) => cm(g.position)),
 			y: this.guides.filter((g) => g.orientation == "h").map((g) => -cm(g.position)),
@@ -82,7 +81,19 @@ export class PageFrame {
 	/** called after every change, e.g. to redraw the editor */
 	public onChange: () => void = () => {}
 
+	private switchBound = false
 	public redraw() {
+		const toggle = document.getElementById("guidesVisible") as HTMLInputElement | null
+		if (toggle) {
+			toggle.checked = this.guidesVisible
+			if (!this.switchBound) {
+				this.switchBound = true
+				toggle.addEventListener("change", () => {
+					this.guidesVisible = toggle.checked
+					this.redraw()
+				})
+			}
+		}
 		const canvas = CanvasController.instance?.canvas
 		if (!canvas) return
 		this.frameElement?.remove()
@@ -110,25 +121,6 @@ export class PageFrame {
 			line.back()
 			this.guideElements.push(line)
 		}
-	}
-
-	/** the lines to snap to which are closest to the points, each axis separately: the vector to move by (undefined: no guide near) */
-	public snapVector(points: SVG.Point[], maxDistance: number): { x?: number; y?: number } {
-		const { x: gx, y: gy } = this.guidePositions()
-		const result: { x?: number; y?: number } = {}
-		for (const point of points) {
-			for (const g of gx) {
-				const d = g - point.x
-				if (Math.abs(d) <= maxDistance && (result.x === undefined || Math.abs(d) < Math.abs(result.x)))
-					result.x = d
-			}
-			for (const g of gy) {
-				const d = g - point.y
-				if (Math.abs(d) <= maxDistance && (result.y === undefined || Math.abs(d) < Math.abs(result.y)))
-					result.y = d
-			}
-		}
-		return result
 	}
 
 	/** the TikZ line which makes the page the bounding box of the picture */
@@ -288,25 +280,8 @@ export class PageEditor {
 
 			const guideHeader = document.createElement("div")
 			guideHeader.classList.add("fw-semibold", "mt-2")
-			guideHeader.textContent = "Guides (components snap to them)"
+			guideHeader.textContent = "Guides (shown on the canvas, switch in the view settings)"
 			body.appendChild(guideHeader)
-			const showGuides = document.createElement("div")
-			showGuides.classList.add("form-check", "form-switch")
-			const showBox = document.createElement("input")
-			showBox.type = "checkbox"
-			showBox.classList.add("form-check-input")
-			showBox.id = "guidesVisible"
-			showBox.checked = PageFrame.instance.guidesVisible
-			showBox.addEventListener("change", () => {
-				PageFrame.instance.guidesVisible = showBox.checked
-				changed()
-			})
-			const showLabel = document.createElement("label")
-			showLabel.classList.add("form-check-label")
-			showLabel.htmlFor = "guidesVisible"
-			showLabel.textContent = "Show guides and snap to them"
-			showGuides.append(showBox, showLabel)
-			body.appendChild(showGuides)
 			PageFrame.instance.guides.forEach((guide, index) => {
 				const input = numberInput(guide.position, (v) => (guide.position = v), 0.25)
 				const group = row(guide.orientation == "v" ? "x (cm)" : "y (cm)", input)
@@ -330,6 +305,7 @@ export class PageEditor {
 						:	p.y + p.height / 2
 					:	0
 				PageFrame.instance.guides.push({ orientation, position })
+				PageFrame.instance.guidesVisible = true
 				changed()
 				PageFrame.instance.onChange()
 			}

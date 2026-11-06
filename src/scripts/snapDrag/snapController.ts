@@ -3,7 +3,6 @@
  */
 
 import * as SVG from "@svgdotjs/svg.js"
-import { PageFrame } from "../utils/pageFrame"
 import { CanvasController, CircuitComponent, MainController, SnapPoint } from "../internal"
 
 type DistStruct = {
@@ -208,14 +207,6 @@ export class SnapController {
 		} else {
 			this.positionSnapPoints(distStruct.snapPoints)
 		}
-
-		// guides win over the grid on their axis
-		const guideSnap = PageFrame.instance.snapVector(
-			movingSnapPoints.map((point) => point.add(distStruct.vector)),
-			maxSnapDistance
-		)
-		if (guideSnap.x !== undefined) distStruct.vector = new SVG.Point(distStruct.vector.x + guideSnap.x, distStruct.vector.y)
-		if (guideSnap.y !== undefined) distStruct.vector = new SVG.Point(distStruct.vector.x, distStruct.vector.y + guideSnap.y)
 
 		return distStruct.vector.add(pos)
 	}
