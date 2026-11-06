@@ -783,15 +783,15 @@ export class AxisComponent extends ShapeComponent {
 
 	public update(): void {
 		super.update()
+		// the outline of the component itself is never shown, the box is part of the content
+		this.componentVisualization?.stroke({ width: 0 })
 		this.renderContent()
 		this.requestTextRender()
 	}
 
 	public updateTheme(): void {
 		super.updateTheme()
-		if (this.axis.style != "box") {
-			this.componentVisualization?.stroke({ width: 0 })
-		}
+		this.componentVisualization?.stroke({ width: 0 })
 		this.renderContent()
 	}
 
@@ -817,6 +817,12 @@ export class AxisComponent extends ShapeComponent {
 		const gridColor = "var(--bs-secondary-color, #888)"
 		path(layout.gridMinor, { color: gridColor, width: 0.4, opacity: 0.4 })
 		path(layout.gridMajor, { color: gridColor, width: 0.6, opacity: 0.6 })
+		if (this.axis.style == "box") {
+			// drawn here, so it follows the style directly (not through the outline of the component)
+			g.rect(this.size.x, this.size.y)
+				.fill("none")
+				.stroke({ color: stroke, width: lineWidth, opacity: this.strokeInfo.opacity })
+		}
 		path(layout.axisLines, { color: stroke, width: lineWidth, opacity: this.strokeInfo.opacity })
 		path(layout.ticks, { color: stroke, width: lineWidth, opacity: this.strokeInfo.opacity })
 		path(layout.minorTicks, { color: stroke, width: lineWidth, opacity: this.strokeInfo.opacity })
