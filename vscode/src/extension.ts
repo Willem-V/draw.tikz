@@ -41,12 +41,18 @@ class DrawTikzEditorProvider implements vscode.CustomTextEditorProvider {
 		panel.webview.html = await this.getHtml(panel.webview, appFolder)
 
 		// the text last sent by the app, to not send its own edits back to it
-		let appText: string | undefined
-		const sendLoad = () => panel.webview.postMessage({ type: "load", text: document.getText() })
+		// the texts which the app sent and which VS Code may still report as changes. Comparing only with the latest text
+		// reloaded the drawing (and lost the selection) when the app made several edits quickly, because the change event of
+		// an older edit arrives after the app already sent a newer text
+		const ownTexts = new Set<string>()
+		const sendLoad = () => {
+			ownTexts.clear()
+			panel.webview.postMessage({ type: "load", text: document.getText() })
+		}
 
 		const changeListener = vscode.workspace.onDidChangeTextDocument((ev) => {
 			// changes from outside the app, e.g. git checkout, undo in VS Code or editing the json as text
-			if (ev.document.uri.toString() == document.uri.toString() && document.getText() != appText) {
+			if (ev.document.uri.toString() == document.uri.toString() && !ownTexts.delete(document.getText())) {
 				sendLoad()
 			}
 		})
@@ -78,8 +84,8 @@ class DrawTikzEditorProvider implements vscode.CustomTextEditorProvider {
 					sendLoad()
 					break
 				case "edit":
-					appText = message.text
 					if (message.text != document.getText()) {
+						ownTexts.add(message.text)
 						const edit = new vscode.WorkspaceEdit()
 						edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), message.text)
 						await vscode.workspace.applyEdit(edit)
@@ -159,7 +165,19 @@ async function exportDrawing(
 	const drawingFolder = vscode.Uri.joinPath(document.uri, "..")
 	let target: vscode.Uri | undefined
 	if (storedPath) {
-		target = vscode.Uri.joinPath(drawingFolder, storedPath)
+		// the old path is filled in, so Enter overwrites the file, but it can be edited (missing folders are created)
+		const input = await vscode.window.showInputBox({
+			title: `Export ${format == "tikz" ? "CircuiTikZ code" : "SVG"}`,
+			prompt: "Path of the export file, relative to the drawing",
+			value: storedPath,
+			valueSelection: [storedPath.lastIndexOf("/") + 1, storedPath.length - path.posix.extname(storedPath).length],
+			validateInput: (value) => (value.trim() ? undefined : "Enter a path"),
+		})
+		if (!input) {
+			return undefined
+		}
+		target = vscode.Uri.joinPath(drawingFolder, input.trim())
+		await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(target, ".."))
 	} else {
 		const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri)?.uri ?? drawingFolder
 		// without the setting the export is suggested next to the drawing

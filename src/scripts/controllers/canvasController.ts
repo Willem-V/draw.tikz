@@ -109,6 +109,29 @@ export class CanvasController {
 			CanvasController.instance.draggingFromInput = null
 		})
 
+		// the handlers below prevent the default of mousedown, which also prevents the focus from moving to the window. In a VS Code
+		// webview the shortcuts then stay dead after the focus was somewhere else (editor, quick input, ...), so take the focus
+		document.addEventListener(
+			"pointerdown",
+			() => {
+				if (!document.hasFocus()) {
+					window.focus()
+				}
+				if (!document.activeElement || document.activeElement == document.documentElement) {
+					document.body.tabIndex = -1
+					document.body.focus({ preventScroll: true })
+				}
+			},
+			{ capture: true }
+		)
+		window.addEventListener("focus", () => {
+			// keys go to the body again, not to a (hidden) element which had the focus before
+			const focused = document.activeElement
+			if (!(focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement)) {
+				document.body.focus()
+			}
+		})
+
 		// the selection and drag handlers prevent the default of mousedown, which also keeps the focus in e.g. a property input.
 		// Shortcuts (like del) are ignored while an input has the focus, so clicking the canvas has to take it away
 		this.canvas.node.addEventListener(
