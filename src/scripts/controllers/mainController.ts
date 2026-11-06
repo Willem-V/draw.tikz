@@ -30,6 +30,7 @@ import {
 	ComponentSymbol,
 	ComponentSaveObject,
 	RectangleComponent,
+	TableComponent,
 	EllipseComponent,
 	defaultStroke,
 	defaultFill,
@@ -1145,6 +1146,32 @@ export class MainController {
 				color: defaultStroke,
 				width: 1,
 			})
+		}
+		//Add table
+		{
+			const addButton: HTMLDivElement = accordionItemBody.appendChild(document.createElement("div"))
+			addButton.classList.add("libComponent")
+			addButton.setAttribute("searchData", "table grid cells matrix")
+			addButton.ariaRoleDescription = "button"
+			addButton.title = "Table"
+
+			const listener = (ev: MouseEvent) => {
+				ev.preventDefault()
+				this.switchMode(Modes.DRAG_PAN)
+				ComponentPlacer.instance.placeComponent(new TableComponent())
+				leftOffcanvasOC.hide()
+			}
+
+			addButton.addEventListener("mouseup", listener)
+			addButton.addEventListener("touchstart", listener, { passive: false })
+
+			let svgIcon = SVG.SVG().addTo(addButton)
+			svgIcon.viewbox(0, 0, 17, 12)
+			const stroke = { color: defaultStroke, width: 1 }
+			svgIcon.rect(15, 10).move(1, 1).fill("none").stroke(stroke)
+			svgIcon.line(1, 5, 16, 5).stroke(stroke)
+			svgIcon.line(6, 1, 6, 11).stroke(stroke)
+			svgIcon.line(11, 1, 11, 11).stroke(stroke)
 		}
 		//Add Ellipse
 		{

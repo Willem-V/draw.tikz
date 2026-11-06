@@ -64,6 +64,7 @@ All controls of the editor are explained in the help menu (circled question mark
   - **Plain style settings:** readable names for the environment settings, and the transistor style is picked from two previews
 - **Color palette:** the drawing has a palette (Okabe-Ito by default, editable under General settings: change, rename, add, remove, select everything that uses a color). Every color field has a palette button; components that use a palette color follow when it changes. The palette is saved in the drawing and exported as `\definecolor{dtName}{RGB}{r, g, b}` for the colors that are used, and the importer reads such definitions again
 - **Colors for symbols:** all circuit symbols have a "Color" (stroke section), and a group can set stroke, fill and text color for everything inside it
+- **Tables** (Basic group of the symbol picker): a grid of cells with text and `$math$`. The content is typed as rows (lines) of cells separated by `&`, and pasted spreadsheet cells work too. Options for the outer border, row lines, column lines, a thicker header line, alignment, font size, padding and text color. The columns and rows share the size equally (resize with the handles). Exported as TikZ lines and nodes, so the preview matches
 - No Google Analytics, no Electron desktop app
 
 ## Features
