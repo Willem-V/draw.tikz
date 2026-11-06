@@ -654,6 +654,14 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 		return [this.componentVisualization, this.poleStartElement, this.poleEndElement]
 	}
 
+	protected updateLineWidth() {
+		super.updateLineWidth()
+		// the leads next to the symbol are as thick as the symbol (their default is 0.5px)
+		const width = 0.5 * this.lineScale
+		this.startLine?.stroke({ width })
+		this.endLine?.stroke({ width })
+	}
+
 	protected colorElements(): SVG.Element[] {
 		// the leads of the symbol have the color of the symbol
 		return [...this.lineWidthElements(), this.startLine, this.endLine]
