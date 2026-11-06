@@ -1,6 +1,10 @@
 import * as SVG from "@svgdotjs/svg.js"
 import {
 	AdjustDragHandler,
+	ArrowTip,
+	arrowTips,
+	ChoiceProperty,
+	defaultArrowTip,
 	BooleanProperty,
 	ButtonGridProperty,
 	CanvasController,
@@ -31,6 +35,8 @@ export type BezierSaveObject = PathSaveObject & {
 	/** false: the control points are edited by hand (points: anchor, control, control, anchor, ...) */
 	auto?: boolean
 	smoothness?: number
+	startArrow?: string
+	endArrow?: string
 }
 
 /**
@@ -51,6 +57,10 @@ export class BezierComponent extends Strokable(Fillable(PathComponent)) {
 	private autoProperty: BooleanProperty
 	private smoothnessProperty: SliderProperty
 	private controlLines: SVG.Path
+	private startTipChoice: ChoiceProperty<ArrowTip>
+	private endTipChoice: ChoiceProperty<ArrowTip>
+	private startTipElement: SVG.Element | null = null
+	private endTipElement: SVG.Element | null = null
 
 	private size = new SVG.Point()
 	/** while placing: the anchors, the last one follows the cursor (free-hand: all recorded points) */
@@ -117,6 +127,54 @@ export class BezierComponent extends Strokable(Fillable(PathComponent)) {
 			}
 		})
 		this.properties.add(PropertyCategories.options, this.smoothnessProperty)
+
+		this.properties.add(PropertyCategories.options, new SectionHeaderProperty("Arrows", undefined, "bezier:arrows"))
+		this.startTipChoice = new ChoiceProperty("Start", arrowTips, defaultArrowTip, undefined, "arrows:start")
+		this.startTipChoice.addChangeListener(() => this.updateTips())
+		this.properties.add(PropertyCategories.options, this.startTipChoice)
+		this.endTipChoice = new ChoiceProperty("End", arrowTips, defaultArrowTip, undefined, "arrows:end")
+		this.endTipChoice.addChangeListener(() => this.updateTips())
+		this.properties.add(PropertyCategories.options, this.endTipChoice)
+	}
+
+	/** the arrow tips at the ends of an open curve (the symbols are the ones of the wires) */
+	private updateTips() {
+		const color = this.strokeInfo.color == "default" ? defaultStroke : (this.strokeInfo.color as string)
+		const scale = this.strokeInfo.width.convertToUnit("pt").value * 4.5 + 2.8
+		const strokeWidth = this.strokeInfo.width.convertToUnit("px").value / scale
+		const points = this.referencePoints
+		const make = (choice: ArrowTip, tip: SVG.Point, from: SVG.Point, old: SVG.Element | null) => {
+			old?.remove()
+			if (choice.key == defaultArrowTip.key || this.closedProperty.value || points.length < 2) return null
+			const group = CanvasController.instance.canvas.group()
+			group.addTo(this.visualization)
+			group.stroke({ color, opacity: this.strokeInfo.opacity })
+			group.fill({ color, opacity: this.strokeInfo.opacity })
+			for (const element of document.getElementById(choice.key).children) {
+				group.node.append(element.cloneNode(true))
+			}
+			const direction = tip.sub(from)
+			const angle = (Math.atan2(direction.y, direction.x) * 180) / Math.PI
+			const ref = choice.refXY ?? new SVG.Point(-1, -0.5)
+			group.transform(
+				new SVG.Matrix({ translate: tip.toArray(), rotate: angle, scale: [scale, scale] }).multiply({
+					translate: ref.toArray(),
+				})
+			)
+			group.attr("stroke-width", strokeWidth * (choice.strokeFactor ?? 0))
+			return group
+		}
+		// the direction at the ends: from the nearest point which is not the end itself
+		const first = points[0]
+		const last = points.at(-1)
+		const afterFirst = points.slice(1).find((p) => !p.eq(first)) ?? first
+		const beforeLast =
+			points
+				.slice(0, -1)
+				.reverse()
+				.find((p) => !p.eq(last)) ?? last
+		this.startTipElement = make(this.startTipChoice.value, first, afterFirst, this.startTipElement)
+		this.endTipElement = make(this.endTipChoice.value, last, beforeLast, this.endTipElement)
 	}
 
 	private get smoothness(): number {
@@ -203,6 +261,7 @@ export class BezierComponent extends Strokable(Fillable(PathComponent)) {
 			this.controlLines.hide()
 		}
 
+		this.updateTips()
 		this.recalculateSelectionVisuals()
 		this.recalculateSnappingPoints()
 		this.recalculateResizePoints()
@@ -321,6 +380,7 @@ export class BezierComponent extends Strokable(Fillable(PathComponent)) {
 			color: this.fillInfo.color == "default" ? "none" : this.fillInfo.color,
 			opacity: this.fillInfo.opacity,
 		})
+		if (this.referencePoints.length > 0) this.updateTips()
 	}
 
 	// ---- placing ----
@@ -397,6 +457,8 @@ export class BezierComponent extends Strokable(Fillable(PathComponent)) {
 		if (this.closedProperty.value) data.closed = true
 		if (!this.autoProperty.value) data.auto = false
 		if (this.smoothness !== 1) data.smoothness = this.smoothness
+		if (this.startTipChoice.value.key !== defaultArrowTip.key) data.startArrow = this.startTipChoice.value.key
+		if (this.endTipChoice.value.key !== defaultArrowTip.key) data.endArrow = this.endTipChoice.value.key
 		return data
 	}
 
@@ -405,6 +467,8 @@ export class BezierComponent extends Strokable(Fillable(PathComponent)) {
 		this.closedProperty.value = saveObject.closed ?? false
 		this.autoProperty.value = saveObject.auto ?? true
 		this.smoothnessProperty.value = new SVG.Number(saveObject.smoothness ?? 1)
+		this.startTipChoice.value = arrowTips.find((tip) => tip.key == saveObject.startArrow) ?? defaultArrowTip
+		this.endTipChoice.value = arrowTips.find((tip) => tip.key == saveObject.endArrow) ?? defaultArrowTip
 		this.freehand = false
 		this.update()
 		this.updateTheme()
@@ -419,6 +483,17 @@ export class BezierComponent extends Strokable(Fillable(PathComponent)) {
 		// the options are set, the coordinates are the anchors and the control points of the segments
 		const points = this.referencePoints
 		const closed = this.closedProperty.value
+		if (!closed) {
+			const start = this.startTipChoice.value
+			const end = this.endTipChoice.value
+			if (start.key !== defaultArrowTip.key || end.key !== defaultArrowTip.key) {
+				command.options.push(
+					(start.key !== defaultArrowTip.key ? start.tikz : "") +
+						"-" +
+						(end.key !== defaultArrowTip.key ? end.tikz : "")
+				)
+			}
+		}
 		command.coordinates = []
 		command.connectors = []
 		const anchors = this.anchors()

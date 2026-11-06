@@ -35,6 +35,8 @@ import {
 	TableComponent,
 	AxisComponent,
 	ImageComponent,
+	DimensionLineComponent,
+	BraceComponent,
 	chooseImageFile,
 	EllipseComponent,
 	defaultStroke,
@@ -1151,6 +1153,52 @@ export class MainController {
 				color: defaultStroke,
 				width: 1,
 			})
+		}
+		//Add dimension line, brace
+		for (const entry of [
+			{
+				title: "Dimension line",
+				search: "dimension measure length arrow double arrow size",
+				create: () => new DimensionLineComponent(),
+				icon: (svgIcon: SVG.Svg) => {
+					const stroke = { color: defaultStroke, width: 1 }
+					svgIcon.line(2, 3, 2, 11).stroke(stroke)
+					svgIcon.line(15, 3, 15, 11).stroke(stroke)
+					svgIcon.line(2, 7, 15, 7).stroke(stroke)
+					svgIcon.polygon([2, 7, 5, 5.5, 5, 8.5]).fill(defaultStroke)
+					svgIcon.polygon([15, 7, 12, 5.5, 12, 8.5]).fill(defaultStroke)
+				},
+			},
+			{
+				title: "Brace",
+				search: "brace curly bracket group",
+				create: () => new BraceComponent(),
+				icon: (svgIcon: SVG.Svg) =>
+					svgIcon
+						.path("M 2 9 Q 2 6, 5 6 L 6.5 6 Q 8.5 6, 8.5 3 Q 8.5 6, 10.5 6 L 12 6 Q 15 6, 15 9")
+						.fill("none")
+						.stroke({ color: defaultStroke, width: 1 }),
+			},
+		]) {
+			const addButton: HTMLDivElement = accordionItemBody.appendChild(document.createElement("div"))
+			addButton.classList.add("libComponent")
+			addButton.setAttribute("searchData", entry.search)
+			addButton.ariaRoleDescription = "button"
+			addButton.title = entry.title
+
+			const listener = (ev: MouseEvent) => {
+				ev.preventDefault()
+				this.switchMode(Modes.DRAG_PAN)
+				ComponentPlacer.instance.placeComponent(entry.create())
+				leftOffcanvasOC.hide()
+			}
+
+			addButton.addEventListener("mouseup", listener)
+			addButton.addEventListener("touchstart", listener, { passive: false })
+
+			let svgIcon = SVG.SVG().addTo(addButton)
+			svgIcon.viewbox(0, 0, 17, 12)
+			entry.icon(svgIcon)
 		}
 		//Add image
 		{
