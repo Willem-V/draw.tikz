@@ -26,6 +26,7 @@ export type SaveFileFormat = {
 	page?: PageSettings
 	/** lines which components snap to, positions in cm */
 	guides?: Guide[]
+	guidesHidden?: boolean
 	/** where the drawing was last exported to, relative to the save file (only used by the VS Code extension) */
 	exports?: { tikz?: string; svg?: string }
 	/** svg of the components for the symbol picker, only in reusable component files (see utils/componentLibrary.ts) */
@@ -127,7 +128,7 @@ export class SaveController {
 			}
 			// before the components, which use its colors
 			Palette.instance.fromJson(saveFile.palette)
-			PageFrame.instance.fromJson({ page: saveFile.page, guides: saveFile.guides })
+			PageFrame.instance.fromJson({ page: saveFile.page, guides: saveFile.guides, guidesHidden: saveFile.guidesHidden })
 
 			for (const component of saveFile.components) {
 				let c = SaveController.fromJson(component)

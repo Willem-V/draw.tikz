@@ -11,7 +11,7 @@ import {
 /** the size of the figure (the "page") and the guides, both are saved in the drawing */
 export type PageSettings = { enabled: boolean; width: number; height: number; x: number; y: number }
 export type Guide = { orientation: "v" | "h"; position: number }
-export type PageSaveData = { page?: PageSettings; guides?: Guide[] }
+export type PageSaveData = { page?: PageSettings; guides?: Guide[]; guidesHidden?: boolean }
 
 /** widths of typical figures in cm */
 const presets: { key: string; name: string; width?: number; height?: number }[] = [
@@ -37,6 +37,8 @@ export class PageFrame {
 
 	public page: PageSettings = { enabled: false, width: 8.5, height: 6, x: 0, y: 0 }
 	public guides: Guide[] = []
+	/** hidden guides are not drawn and components do not snap to them */
+	public guidesVisible = true
 
 	private frameElement: SVG.Rect | undefined
 	private guideElements: SVG.Line[] = []
@@ -54,6 +56,7 @@ export class PageFrame {
 
 	/** the positions of the guides in px: vertical ones as x, horizontal ones as y (canvas coordinates) */
 	public guidePositions(): { x: number[]; y: number[] } {
+		if (!this.guidesVisible) return { x: [], y: [] }
 		return {
 			x: this.guides.filter((g) => g.orientation == "v").map((g) => cm(g.position)),
 			y: this.guides.filter((g) => g.orientation == "h").map((g) => -cm(g.position)),
@@ -63,6 +66,7 @@ export class PageFrame {
 	public toJson(): PageSaveData {
 		const data: PageSaveData = {}
 		if (this.page.enabled) data.page = { ...this.page }
+		if (!this.guidesVisible) data.guidesHidden = true
 		if (this.guides.length > 0) data.guides = this.guides.map((g) => ({ ...g }))
 		return data
 	}
@@ -70,6 +74,7 @@ export class PageFrame {
 	public fromJson(data: PageSaveData) {
 		this.page = { enabled: false, width: 8.5, height: 6, x: 0, y: 0, ...(data.page ?? {}) }
 		this.guides = (data.guides ?? []).map((g) => ({ ...g }))
+		this.guidesVisible = !data.guidesHidden
 		this.redraw()
 		this.onChange()
 	}
@@ -95,7 +100,7 @@ export class PageFrame {
 		this.guideElements.forEach((e) => e.remove())
 		this.guideElements = []
 		const extent = 1e5
-		for (const guide of this.guides) {
+		for (const guide of this.guidesVisible ? this.guides : []) {
 			const line =
 				guide.orientation == "v" ?
 					canvas.line(cm(guide.position), -extent, cm(guide.position), extent)
@@ -285,6 +290,23 @@ export class PageEditor {
 			guideHeader.classList.add("fw-semibold", "mt-2")
 			guideHeader.textContent = "Guides (components snap to them)"
 			body.appendChild(guideHeader)
+			const showGuides = document.createElement("div")
+			showGuides.classList.add("form-check", "form-switch")
+			const showBox = document.createElement("input")
+			showBox.type = "checkbox"
+			showBox.classList.add("form-check-input")
+			showBox.id = "guidesVisible"
+			showBox.checked = PageFrame.instance.guidesVisible
+			showBox.addEventListener("change", () => {
+				PageFrame.instance.guidesVisible = showBox.checked
+				changed()
+			})
+			const showLabel = document.createElement("label")
+			showLabel.classList.add("form-check-label")
+			showLabel.htmlFor = "guidesVisible"
+			showLabel.textContent = "Show guides and snap to them"
+			showGuides.append(showBox, showLabel)
+			body.appendChild(showGuides)
 			PageFrame.instance.guides.forEach((guide, index) => {
 				const input = numberInput(guide.position, (v) => (guide.position = v), 0.25)
 				const group = row(guide.orientation == "v" ? "x (cm)" : "y (cm)", input)
