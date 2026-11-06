@@ -458,7 +458,10 @@ export class AxisComponent extends ShapeComponent {
 			"One point per row. Paste a range from a spreadsheet into any cell, Enter adds a row",
 			"series:table"
 		)
-		series(table, (s, v: string) => (s.table = v))
+		series(table, (s, v: string) => {
+			s.table = v
+			this.updateSeriesVisibility()
+		})
 		const xColumn = new SliderProperty("X column", 1, 20, 1, new SVG.Number(1), true, undefined, "series:xcol")
 		series(xColumn, (s, v: SVG.Number) => (s.xColumn = Math.round(v.value)))
 		const yColumn = new SliderProperty("Y column", 1, 20, 1, new SVG.Number(2), true, undefined, "series:ycol")
@@ -533,7 +536,8 @@ export class AxisComponent extends ShapeComponent {
 			smooth.value = s.smooth
 		}
 		this.formulaProps = [expr, from, to, samples]
-		this.tableProps = [table, xColumn, yColumn]
+		this.tableProps = [table]
+		this.columnProps = [xColumn, yColumn]
 		this.commonProps = [kind, label, color, width, dash, marker, smooth]
 		this.markerSizeProp = markerSize
 		for (const property of [
@@ -561,6 +565,7 @@ export class AxisComponent extends ShapeComponent {
 
 	private formulaProps: any[] = []
 	private tableProps: any[] = []
+	private columnProps: any[] = []
 	private commonProps: any[] = []
 	private markerSizeProp: any
 
@@ -572,6 +577,9 @@ export class AxisComponent extends ShapeComponent {
 		show(this.commonProps, !!s)
 		show(this.formulaProps, !!s && s.kind == "formula")
 		show(this.tableProps, !!s && s.kind == "table")
+		// the columns only need to be chosen when the table has more than two
+		const columns = s ? Math.max(0, ...s.table.split("\n").map((l) => l.trim().split(/[,;\t ]+/).length)) : 0
+		show(this.columnProps, !!s && s.kind == "table" && columns > 2)
 		show([this.markerSizeProp], !!s && s.marker != "none")
 	}
 

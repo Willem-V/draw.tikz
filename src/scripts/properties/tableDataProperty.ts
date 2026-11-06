@@ -32,9 +32,7 @@ export class TableDataProperty extends EditableProperty<string> {
 	private serialize(): string {
 		return this.rows
 			.filter((cells) => cells.some((cell) => cell.trim() !== ""))
-			.map((cells) =>
-				Array.from({ length: this.columns }, (_, i) => (cells[i] ?? "").trim() || "nan").join(" ")
-			)
+			.map((cells) => Array.from({ length: this.columns }, (_, i) => (cells[i] ?? "").trim() || "nan").join(" "))
 			.join("\n")
 	}
 
@@ -73,11 +71,6 @@ export class TableDataProperty extends EditableProperty<string> {
 			this.rows.push([])
 			this.render(this.rows.length - 1, 0)
 		})
-		button("Add column", "Add a column (choose which columns are x and y below)", () => {
-			this.columns = Math.min(20, this.columns + 1)
-			this.render()
-			this.commit()
-		})
 		button("Clear", "Remove all points", () => {
 			this.rows = [[]]
 			this.render(0, 0)
@@ -105,7 +98,12 @@ export class TableDataProperty extends EditableProperty<string> {
 			add(h)
 		}
 		header("")
-		for (let c = 0; c < this.columns; c++) header(c == 0 ? "x" : c == 1 ? "y" : String(c + 1))
+		for (let c = 0; c < this.columns; c++)
+			header(
+				c == 0 ? "x"
+				: c == 1 ? "y"
+				: String(c + 1)
+			)
 		header("")
 		const inputs: HTMLInputElement[][] = []
 		this.rows.forEach((cells, r) => {
