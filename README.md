@@ -62,6 +62,8 @@ All controls of the editor are explained in the help menu (circled question mark
   - **Sections fold:** rarely needed sections (stroke, fill, TikZ name, info, ...) start collapsed, open/closed is remembered
   - **Compact toolbar** at the top for rotate, flip, drawing order and, for a selection, group, align and distribute
   - **Plain style settings:** readable names for the environment settings, and the transistor style is picked from two previews
+- **Color palette:** the drawing has a palette (Okabe-Ito by default, editable under General settings: change, rename, add, remove, select everything that uses a color). Every color field has a palette button; components that use a palette color follow when it changes. The palette is saved in the drawing and exported as `\definecolor{dtName}{RGB}{r, g, b}` for the colors that are used, and the importer reads such definitions again
+- **Colors for symbols:** all circuit symbols have a "Color" (stroke section), and a group can set stroke, fill and text color for everything inside it
 - No Google Analytics, no Electron desktop app
 
 ## Features

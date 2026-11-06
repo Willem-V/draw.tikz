@@ -1,5 +1,12 @@
-import { SectionHeaderProperty, Undo } from "../internal"
-import { Palette } from "./palette"
+import {
+	ColorProperty,
+	MainController,
+	SectionHeaderProperty,
+	SelectionController,
+	SelectionMode,
+	Undo,
+} from "../internal"
+import { Palette, PaletteColor } from "./palette"
 
 /**
  * The editor of the color palette of the drawing for the general settings: change, rename, add and remove colors.
@@ -56,7 +63,26 @@ export class PaletteEditor {
 					Undo.addState()
 				})
 
-				row.append(color, name, remove)
+				const select = document.createElement("button")
+				select.type = "button"
+				select.classList.add("btn", "btn-outline-secondary")
+				select.title = "Select all components which use this color"
+				select.innerHTML = '<span class="material-symbols-outlined" style="font-size:1rem">select_all</span>'
+				select.addEventListener("click", () => {
+					const used = MainController.instance.circuitComponents.filter((component) =>
+						[...component.properties.values()]
+							.flat()
+							.some(
+								(property) =>
+									property instanceof ColorProperty &&
+									property.value instanceof PaletteColor &&
+									property.value.paletteName == entry.name
+							)
+					)
+					SelectionController.instance.selectComponents(used, SelectionMode.RESET)
+				})
+
+				row.append(color, name, select, remove)
 				list.appendChild(row)
 			}
 
