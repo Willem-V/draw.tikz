@@ -28,6 +28,8 @@ import {
 	TikzNodeCommand,
 	TikzPathCommand,
 } from "../internal"
+import { cellToLatex } from "../utils/latexText"
+import { removeTextSVG } from "../utils/svgText"
 import { paletteNameOf, resolveColor } from "../utils/palette"
 import { rectRectIntersection, roundTikz } from "../utils/selectionHelper"
 
@@ -58,32 +60,6 @@ export function parseTableContent(content: string): string[][] {
 	}
 	const columns = Math.max(1, ...rows.map((row) => row.length))
 	return rows.map((row) => [...row, ...Array(columns - row.length).fill("")])
-}
-
-const latexEscapes: Record<string, string> = {
-	"#": "\\#",
-	"%": "\\%",
-	"&": "\\&",
-	"_": "\\_",
-	"{": "\\{",
-	"}": "\\}",
-	"~": "\\textasciitilde{}",
-	"^": "\\textasciicircum{}",
-	"\\": "\\textbackslash{}",
-	"$": "\\$",
-}
-
-/** the text of a cell as LaTeX: $...$ stays math, the rest is escaped */
-function cellToLatex(text: string): string {
-	const parser = new MathjaxParser()
-	return parser
-		.parse(text)
-		.map((element) =>
-			element.type == "text" ?
-				element.text.replaceAll(/[#%&_{}~^\\$]/g, (m) => latexEscapes[m])
-			:	"$" + element.text + "$"
-		)
-		.join(" ")
 }
 
 /**
@@ -245,7 +221,7 @@ export class TableComponent extends ShapeComponent {
 	}
 
 	private updateText() {
-		this.textSVG?.remove()
+		removeTextSVG(this.textSVG)
 		const cells = this.cells
 		const rows = cells.length
 		const columns = cells[0].length

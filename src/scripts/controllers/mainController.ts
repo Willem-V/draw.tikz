@@ -33,6 +33,7 @@ import {
 	BezierComponent,
 	ArcComponent,
 	TableComponent,
+	AxisComponent,
 	EllipseComponent,
 	defaultStroke,
 	defaultFill,
@@ -1148,6 +1149,30 @@ export class MainController {
 				color: defaultStroke,
 				width: 1,
 			})
+		}
+		//Add axes with plots
+		{
+			const addButton: HTMLDivElement = accordionItemBody.appendChild(document.createElement("div"))
+			addButton.classList.add("libComponent")
+			addButton.setAttribute("searchData", "axis axes plot graph chart function diagram data")
+			addButton.ariaRoleDescription = "button"
+			addButton.title = "Axes and plot"
+
+			const listener = (ev: MouseEvent) => {
+				ev.preventDefault()
+				this.switchMode(Modes.DRAG_PAN)
+				ComponentPlacer.instance.placeComponent(new AxisComponent())
+				leftOffcanvasOC.hide()
+			}
+
+			addButton.addEventListener("mouseup", listener)
+			addButton.addEventListener("touchstart", listener, { passive: false })
+
+			let svgIcon = SVG.SVG().addTo(addButton)
+			svgIcon.viewbox(0, 0, 17, 12)
+			const stroke = { color: defaultStroke, width: 1 }
+			svgIcon.path("M 2 1 L 2 10 L 16 10").fill("none").stroke(stroke)
+			svgIcon.path("M 3 9 C 6 9, 7 2, 15 2").fill("none").stroke({ color: "var(--bs-cyan)", width: 1 })
 		}
 		//Add table
 		{
