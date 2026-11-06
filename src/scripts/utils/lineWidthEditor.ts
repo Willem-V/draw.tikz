@@ -25,7 +25,7 @@ export class LineWidthEditor {
 				continue
 			}
 			const properties = [...component.properties.values()].flat()
-			const width = properties.find((p) => p.id == "stroke:width" || p.id == "stroke:symbolLineWidth")
+			const width = properties.find((p) => p.id == "stroke:width")
 			if (!(width instanceof SliderProperty)) continue
 			if (properties.some((p) => p.id == "stroke:lock" && p.value === true)) {
 				locked++

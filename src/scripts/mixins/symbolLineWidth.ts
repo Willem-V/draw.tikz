@@ -41,14 +41,15 @@ export function SymbolLineWidth<TBase extends AbstractConstructor<CircuitCompone
 				new SectionHeaderProperty("Stroke", undefined, "stroke:header")
 			)
 			this.lineWidthProperty = new SliderProperty(
-				"Line width",
+				"Width",
+				0,
+				10,
 				0.1,
-				4,
-				0.05,
 				defaultSymbolLineWidth,
-				true,
+				undefined,
 				"Line width of the symbol. Thick parts of the symbol are scaled accordingly.",
-				"stroke:symbolLineWidth"
+				// the same id as the stroke width of shapes and wires, so a selection of both is edited together
+				"stroke:width"
 			)
 			this.lineWidthProperty.addChangeListener((ev) => {
 				this.updateLineWidth()
@@ -109,7 +110,7 @@ export function SymbolLineWidth<TBase extends AbstractConstructor<CircuitCompone
 		 * the factor by which the strokes are wider than the circuitikz default
 		 */
 		protected get lineScale(): number {
-			return this.lineWidthProperty.value.convertToUnit("pt").value / defaultSymbolLineWidth.value
+			return Math.max(0.01, this.lineWidthProperty.value.convertToUnit("pt").value) / defaultSymbolLineWidth.value
 		}
 
 		/**
