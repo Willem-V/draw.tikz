@@ -71,6 +71,9 @@ export class TableDataProperty extends EditableProperty<string> {
 			this.rows.push([])
 			this.render(this.rows.length - 1, 0)
 		})
+		button("Import file...", "Load the points from a CSV or text file (header lines are skipped)", () =>
+			this.importFile()
+		)
 		button("Clear", "Remove all points", () => {
 			this.rows = [[]]
 			this.render(0, 0)
@@ -78,9 +81,34 @@ export class TableDataProperty extends EditableProperty<string> {
 			Undo.addState()
 		})
 		cell.appendChild(buttons)
+		const hint = document.createElement("div")
+		hint.classList.add("small", "text-secondary", "mt-1")
+		hint.textContent = "Tip: copy cells in a spreadsheet and paste them into the first cell."
+		cell.appendChild(hint)
 		this.loadFromValue()
 		this.render()
 		return row
+	}
+
+	/** replaces the points by those of a CSV / text file; lines which do not start with a number (headers) are skipped */
+	private importFile() {
+		const input = document.createElement("input")
+		input.type = "file"
+		input.accept = ".csv,.tsv,.txt,.dat,text/csv,text/plain"
+		input.addEventListener("change", async () => {
+			const file = input.files?.[0]
+			if (!file) return
+			const rows = TableDataProperty.parse(await file.text()).filter(
+				(r) => r.length > 0 && Number.isFinite(Number(r[0]))
+			)
+			if (rows.length == 0) return
+			this.rows = rows
+			this.columns = Math.max(2, ...rows.map((r) => r.length))
+			this.render()
+			this.commit()
+			Undo.addState()
+		})
+		input.click()
 	}
 
 	private render(focusRow = -1, focusColumn = 0) {
