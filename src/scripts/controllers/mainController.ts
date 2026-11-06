@@ -34,6 +34,8 @@ import {
 	ArcComponent,
 	TableComponent,
 	AxisComponent,
+	ImageComponent,
+	chooseImageFile,
 	EllipseComponent,
 	defaultStroke,
 	defaultFill,
@@ -1149,6 +1151,37 @@ export class MainController {
 				color: defaultStroke,
 				width: 1,
 			})
+		}
+		//Add image
+		{
+			const addButton: HTMLDivElement = accordionItemBody.appendChild(document.createElement("div"))
+			addButton.classList.add("libComponent")
+			addButton.setAttribute("searchData", "image picture photo png jpg svg logo graphic")
+			addButton.ariaRoleDescription = "button"
+			addButton.title = "Image"
+
+			const listener = async (ev: MouseEvent) => {
+				ev.preventDefault()
+				leftOffcanvasOC.hide()
+				const file = await chooseImageFile()
+				if (!file) return
+				try {
+					const component = await ImageComponent.fromFile(file)
+					this.switchMode(Modes.DRAG_PAN)
+					ComponentPlacer.instance.placeComponent(component)
+				} catch (e) {
+					alert((e as Error).message)
+				}
+			}
+
+			addButton.addEventListener("mouseup", listener)
+
+			let svgIcon = SVG.SVG().addTo(addButton)
+			svgIcon.viewbox(0, 0, 17, 12)
+			const stroke = { color: defaultStroke, width: 1 }
+			svgIcon.rect(15, 10).move(1, 1).fill("none").stroke(stroke)
+			svgIcon.path("M 2 10 L 6 5 L 9 8 L 11 6 L 15 10").fill("none").stroke(stroke)
+			svgIcon.circle(2.5).center(12, 4).fill(defaultStroke)
 		}
 		//Add axes with plots
 		{
