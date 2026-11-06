@@ -163,6 +163,9 @@ export class ColorProperty extends EditableProperty<SVG.Color | null> implements
 		return row
 	}
 
+	/** what "no color" looks like: a css color, or "none" for transparent */
+	public defaultColor = "var(--bs-emphasis-color)"
+
 	private swatchElement: HTMLSpanElement
 	private swatchName: HTMLSpanElement
 
@@ -177,9 +180,14 @@ export class ColorProperty extends EditableProperty<SVG.Color | null> implements
 			this.swatchName.textContent = value instanceof PaletteColor ? value.paletteName : value.toHex()
 			this.paletteButton.title =
 				value instanceof PaletteColor ? `Palette color "${value.paletteName}"` : "Custom color"
-		} else {
+		} else if (this.defaultColor == "none") {
+			// transparent: a checkerboard
 			this.swatchElement.style.background =
-				"linear-gradient(to top right, transparent calc(50% - 1px), var(--bs-danger) 50%, transparent calc(50% + 1px)), var(--bs-body-bg)"
+				"repeating-conic-gradient(var(--bs-secondary-bg) 0% 25%, var(--bs-body-bg) 0% 50%) 50% / 10px 10px"
+			this.swatchName.textContent = "none"
+			this.paletteButton.title = "No color"
+		} else {
+			this.swatchElement.style.background = this.defaultColor
 			this.swatchName.textContent = "default"
 			this.paletteButton.title = "Default color of the theme"
 		}
@@ -191,17 +199,24 @@ export class ColorProperty extends EditableProperty<SVG.Color | null> implements
 			return
 		}
 		const popup = document.createElement("div")
-		popup.classList.add("border", "rounded", "bg-body", "shadow", "p-2", "d-flex", "flex-column", "gap-2")
-		Object.assign(popup.style, { position: "fixed", zIndex: "3000", width: "272px" })
+		popup.classList.add("rounded-3", "bg-body", "shadow", "p-3", "d-flex", "flex-column", "gap-2")
+		Object.assign(popup.style, {
+			position: "fixed",
+			zIndex: "3000",
+			width: "260px",
+			border: "1px solid var(--bs-border-color)",
+		})
 
 		const grid = (colors: { name: string; color: string; palette: boolean }[], title: string) => {
 			if (colors.length == 0) return
 			const caption = document.createElement("div")
-			caption.classList.add("small", "text-body-secondary")
+			caption.classList.add("text-body-secondary", "text-uppercase", "fw-semibold")
+			caption.style.fontSize = "0.7rem"
+			caption.style.letterSpacing = "0.05em"
 			caption.textContent = title
 			popup.appendChild(caption)
 			const wrapper = document.createElement("div")
-			Object.assign(wrapper.style, { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "8px" })
+			Object.assign(wrapper.style, { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "8px" })
 			for (const entry of colors) {
 				const swatch = document.createElement("button")
 				swatch.type = "button"
@@ -212,10 +227,12 @@ export class ColorProperty extends EditableProperty<SVG.Color | null> implements
 						this.value instanceof PaletteColor && this.value.paletteName == entry.name
 					:	!(this.value instanceof PaletteColor) && this.value.toHex() == entry.color)
 				Object.assign(swatch.style, {
-					height: "34px",
-					borderRadius: "6px",
-					border: selected ? "3px solid var(--bs-primary)" : "1px solid var(--bs-border-color)",
-					boxShadow: selected ? "0 0 0 1px var(--bs-body-bg) inset" : "",
+					aspectRatio: "1",
+					borderRadius: "50%",
+					padding: "0",
+					border: "1px solid var(--bs-border-color)",
+					boxShadow: selected ? "0 0 0 2px var(--bs-body-bg), 0 0 0 4px var(--bs-primary)" : "",
+					cursor: "pointer",
 					background: entry.color,
 				})
 				swatch.addEventListener("click", () => {
@@ -278,7 +295,7 @@ export class ColorProperty extends EditableProperty<SVG.Color | null> implements
 		popup.appendChild(custom)
 
 		const rect = this.paletteButton.getBoundingClientRect()
-		popup.style.left = `${Math.max(4, Math.min(window.innerWidth - 280, rect.right - 272))}px`
+		popup.style.left = `${Math.max(4, Math.min(window.innerWidth - 270, rect.right - 260))}px`
 		popup.style.top = `${rect.bottom + 4}px`
 		document.body.appendChild(popup)
 		this.palettePopup = popup

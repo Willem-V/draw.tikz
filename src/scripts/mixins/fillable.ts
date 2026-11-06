@@ -56,6 +56,8 @@ export function Fillable<TBase extends AbstractConstructor<CircuitComponent>>(Ba
 			})
 
 			this.fillColorProperty = new ColorProperty("Color", null, undefined, undefined, "fill:color")
+			// without a color the shape is not filled
+			this.fillColorProperty.defaultColor = "none"
 			this.fillColorProperty.addChangeListener((ev) => {
 				this.fillInfo.palette = paletteNameOf(ev.value)
 				if (ev.value == null) {
