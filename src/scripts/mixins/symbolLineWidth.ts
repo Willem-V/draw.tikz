@@ -2,17 +2,23 @@ import * as SVG from "@svgdotjs/svg.js"
 import {
 	AbstractConstructor,
 	CircuitComponent,
+	ColorProperty,
 	ComponentSaveObject,
 	PropertyCategories,
 	SectionHeaderProperty,
 	SliderProperty,
 } from "../internal"
+import type { StrokeInfo } from "./strokable"
 import { roundTikz } from "../utils/selectionHelper"
+import { paletteNameOf, resolveColor } from "../utils/palette"
 
 /**
  * the line width circuitikz uses for symbols by default (thin lines, thick lines are drawn twice as wide)
  */
 export const defaultSymbolLineWidth = new SVG.Number(0.4, "pt")
+
+/** the css variable of the stroke color of the symbols of the database (see MainController.preprocessSymbolColors) */
+const symbolColorVariable = "--bs-emphasis-color"
 
 /**
  * Adds a line width property to components drawn from the symbol database. All strokes of the symbol are scaled
@@ -23,10 +29,15 @@ export const defaultSymbolLineWidth = new SVG.Number(0.4, "pt")
 export function SymbolLineWidth<TBase extends AbstractConstructor<CircuitComponent>>(Base: TBase) {
 	abstract class SymbolLineWidth extends Base {
 		protected lineWidthProperty: SliderProperty
+		/** the color of the whole symbol, null for the color of the theme */
+		protected symbolColorProperty: ColorProperty
 
 		constructor(...args: any[]) {
 			super(...args)
-			this.properties.add(PropertyCategories.stroke, new SectionHeaderProperty("Stroke", undefined, "stroke:header"))
+			this.properties.add(
+				PropertyCategories.stroke,
+				new SectionHeaderProperty("Stroke", undefined, "stroke:header")
+			)
 			this.lineWidthProperty = new SliderProperty(
 				"Line width",
 				0.1,
@@ -42,6 +53,46 @@ export function SymbolLineWidth<TBase extends AbstractConstructor<CircuitCompone
 				this.update()
 			})
 			this.properties.add(PropertyCategories.stroke, this.lineWidthProperty)
+
+			// the symbols draw with the css variable of the default stroke color, so it is replaced on the elements
+			this.symbolColorProperty = new ColorProperty(
+				"Color",
+				null,
+				undefined,
+				"Color of the symbol",
+				"stroke:color"
+			)
+			this.symbolColorProperty.addChangeListener(() => {
+				this.updateSymbolColor()
+				this.update()
+			})
+			this.properties.add(PropertyCategories.stroke, this.symbolColorProperty)
+		}
+
+		/**
+		 * the elements whose color follows the color of the symbol
+		 */
+		protected colorElements(): SVG.Element[] {
+			return this.lineWidthElements()
+		}
+
+		protected updateSymbolColor() {
+			const color = this.symbolColorProperty.value
+			for (const element of this.colorElements()) {
+				if (color) {
+					element?.node.style.setProperty(symbolColorVariable, color.toHex())
+				} else {
+					element?.node.style.removeProperty(symbolColorVariable)
+				}
+			}
+		}
+
+		/**
+		 * the tikz option for the color (if there is one)
+		 */
+		protected symbolColorTikzOptions(): string[] {
+			const color = this.symbolColorProperty.value
+			return color ? ["color=" + color.toTikzString()] : []
 		}
 
 		/**
@@ -89,8 +140,15 @@ export function SymbolLineWidth<TBase extends AbstractConstructor<CircuitCompone
 				}
 				const scale = Number.parseFloat(use.node.style.getPropertyValue("--line-scale")) || 1
 				use.node.style.removeProperty("--line-scale")
-				const exportId = scale == 1 ? id : id + "_lw" + scale.toFixed(3).replace(".", "-")
-				if (scale == 1 || !defs.has(exportId)) {
+				const color = use.node.style.getPropertyValue(symbolColorVariable).trim()
+				use.node.style.removeProperty(symbolColorVariable)
+				const exportId =
+					scale == 1 && !color ?
+						id
+					:	id +
+						(scale == 1 ? "" : "_lw" + scale.toFixed(3).replace(".", "-")) +
+						(color ? "_c" + color.replace("#", "") : "")
+				if ((scale == 1 && !color) || !defs.has(exportId)) {
 					const element = new SVG.Element(document.getElementById(id).cloneNode(true))
 					element.id(exportId)
 					for (const child of [element.node, ...element.node.querySelectorAll("[stroke-width]")]) {
@@ -98,6 +156,16 @@ export function SymbolLineWidth<TBase extends AbstractConstructor<CircuitCompone
 						if (!Number.isNaN(strokeWidth)) {
 							;(child as SVGElement).style.removeProperty("stroke-width")
 							child.setAttribute("stroke-width", (strokeWidth * scale).toString())
+						}
+					}
+					if (color) {
+						// css variables are not supported everywhere (e.g. inkscape): write the color
+						for (const child of [element.node, ...element.node.querySelectorAll("*")]) {
+							for (const attribute of ["fill", "stroke"]) {
+								if (child.getAttribute(attribute) == `var(${symbolColorVariable})`) {
+									child.setAttribute(attribute, color)
+								}
+							}
 						}
 					}
 					defs.set(exportId, element)
@@ -108,16 +176,23 @@ export function SymbolLineWidth<TBase extends AbstractConstructor<CircuitCompone
 		}
 
 		public toJson(): ComponentSaveObject {
-			const data = super.toJson() as ComponentSaveObject & { lineWidth?: string }
+			const data = super.toJson() as ComponentSaveObject & { lineWidth?: string; stroke?: StrokeInfo }
 			if (this.lineWidthTikzOptions().length > 0) {
 				data.lineWidth = this.lineWidthProperty.value.toString()
+			}
+			const color = this.symbolColorProperty.value
+			if (color) {
+				data.stroke = { color: color.toHex(), palette: paletteNameOf(color) }
 			}
 			return data
 		}
 
-		protected applyJson(saveObject: ComponentSaveObject & { lineWidth?: string }): void {
+		protected applyJson(saveObject: ComponentSaveObject & { lineWidth?: string; stroke?: StrokeInfo }): void {
 			super.applyJson(saveObject)
-			this.lineWidthProperty.value = saveObject.lineWidth ? new SVG.Number(saveObject.lineWidth) : defaultSymbolLineWidth
+			this.symbolColorProperty.value = resolveColor(saveObject.stroke?.color, saveObject.stroke?.palette)
+			this.updateSymbolColor()
+			this.lineWidthProperty.value =
+				saveObject.lineWidth ? new SVG.Number(saveObject.lineWidth) : defaultSymbolLineWidth
 			this.updateLineWidth()
 		}
 	}
