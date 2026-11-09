@@ -1,3 +1,5 @@
+import { Guide, PageFrame, PageSettings } from "../utils/pageFrame"
+import { Palette, PaletteEntry } from "../utils/palette"
 import {
 	SelectionController,
 	Undo,
@@ -18,6 +20,13 @@ export type SaveFileFormat = {
 	version: string
 	tikzSettings: GlobalTikzSettings
 	components: ComponentSaveObject[]
+	/** the named colors of the drawing, only if they differ from the default palette (see utils/palette.ts) */
+	palette?: PaletteEntry[]
+	/** the page frame of the figure (see utils/pageFrame.ts) */
+	page?: PageSettings
+	/** lines which components snap to, positions in cm */
+	guides?: Guide[]
+	guidesHidden?: boolean
 	/** where the drawing was last exported to, relative to the save file (only used by the VS Code extension) */
 	exports?: { tikz?: string; svg?: string }
 	/** svg of the components for the symbol picker, only in reusable component files (see utils/componentLibrary.ts) */
@@ -68,6 +77,11 @@ export class SaveController {
 			tikzSettings: settingsData,
 			components: componentArray,
 		}
+		const palette = Palette.instance.toJson()
+		if (palette) {
+			data.palette = palette
+		}
+		Object.assign(data, PageFrame.instance.toJson())
 		if (exports) {
 			data.exports = exports
 		}
@@ -112,6 +126,9 @@ export class SaveController {
 				// check if tikzSettings are present and load them
 				EnvironmentVariableController.instance.fromJson(saveFile.tikzSettings)
 			}
+			// before the components, which use its colors
+			Palette.instance.fromJson(saveFile.palette)
+			PageFrame.instance.fromJson({ page: saveFile.page, guides: saveFile.guides, guidesHidden: saveFile.guidesHidden })
 
 			for (const component of saveFile.components) {
 				let c = SaveController.fromJson(component)

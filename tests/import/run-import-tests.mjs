@@ -29,6 +29,9 @@ const rootSrc = path.resolve(here, "../../src/scripts")
 const { tokenizeTikz } = await import(`${rootSrc}/import/tikzLexer.ts`)
 const diagnosticsMod = await import(`${rootSrc}/import/diagnostics.ts`)
 const parserMod = await import(`${rootSrc}/import/tikzParser.ts`)
+const { compileExpression, sampleFormula } = await import(`${rootSrc}/utils/expression.ts`)
+const ticksMod = await import(`${rootSrc}/utils/ticks.ts`)
+const plotModel = await import(`${rootSrc}/utils/plotModel.ts`)
 const { DiagnosticsCollector } = diagnosticsMod
 const { parseTikz } = parserMod
 
@@ -348,6 +351,96 @@ summary("Parser: shifted named point in a path")
 	const named = doc.statements[0].elements.find((e) => e.kind === "named-point")
 	assert(named?.name === "A" && named.anchor === "north", "Parsed as a named point", `got ${JSON.stringify(named)}`)
 	assert(eqDeep(named.shift, { x: undefined, y: "1mm" }), "Shift kept", `got ${JSON.stringify(named?.shift)}`)
+}
+
+summary("Plots: formulas")
+{
+	const ev = (text, x = 0) => compileExpression(text)(x)
+	assert(ev("1+2*3") === 7, "Precedence")
+	assert(ev("2^3^2") === 512, "Power is right associative")
+	assert(ev("-x^2", 3) === -9, "Unary minus binds weaker than the power")
+	assert(Math.abs(ev("sin(pi*x)", 0.5) - 1) < 1e-12, "Functions and constants")
+	assert(ev("2x+1", 3) === 7, "Implicit product after a number")
+	assert(ev("3(x+1)", 1) === 6, "Implicit product with parenthesis")
+	assert(ev("max(1, x, 2)", 5) === 5, "Several arguments")
+	let message = ""
+	try {
+		compileExpression("foo(x)")
+	} catch (e) {
+		message = e.message
+	}
+	assert(message.includes("foo"), "Unknown names are reported", message)
+	try {
+		compileExpression("1 +")
+	} catch (e) {
+		message = e.message
+	}
+	assert(message.includes("early"), "Incomplete formulas are reported", message)
+	const points = sampleFormula("1/x", -1, 1, 3)
+	assert(points[1] === null, "Not finite values interrupt the curve", JSON.stringify(points))
+	const log = sampleFormula("x", 1, 100, 3, true)
+	assert(Math.abs(log[1][0] - 10) < 1e-9, "Samples are spaced logarithmically", JSON.stringify(log))
+}
+
+summary("Plots: ticks and tables")
+{
+	const { niceStep, linearTicks, linearMinorTicks, logTicks, formatTick, parseCustomTicks, parseTable } = ticksMod
+	assert(niceStep(10) === 2, "Nice step for 0..10", String(niceStep(10)))
+	assert(niceStep(1) === 0.2, "Nice step for 0..1", String(niceStep(1)))
+	assert(JSON.stringify(linearTicks(0, 1, 0.1)) === JSON.stringify([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]), "No floating point noise")
+	assert(JSON.stringify(linearTicks(-1, 1, 0.5)) === JSON.stringify([-1, -0.5, 0, 0.5, 1]), "Ticks over zero")
+	assert(JSON.stringify(linearMinorTicks(0, 2, 1, 1)) === JSON.stringify([0.5, 1.5]), "Minor ticks")
+	assert(JSON.stringify(logTicks(0.5, 2000)) === JSON.stringify([1, 10, 100, 1000]), "Decades")
+	assert(formatTick(1000, true) === "10^{3}", "Log tick label", formatTick(1000, true))
+	assert(formatTick(0.5) === "0.5" && formatTick(-2) === "-2", "Plain tick labels")
+	assert(formatTick(2.5e6) === "2.5\\cdot 10^{6}", "Large numbers use an exponent", formatTick(2.5e6))
+	const custom = parseCustomTicks("0, 0.5:half; 1")
+	assert(custom.length === 3 && custom[1].label === "half", "Custom ticks with labels", JSON.stringify(custom))
+	const table = parseTable("x y\n1, 2\n3\t4\n# c\n5 6", 1, 2)
+	assert(JSON.stringify(table) === "[[1,2],[3,4],[5,6]]", "Table skips headers and comments", JSON.stringify(table))
+	assert(JSON.stringify(parseTable("1 2 3\n4 5 6", 1, 3)) === "[[1,3],[4,6]]", "Column choice")
+}
+
+summary("Plots: unusable limits")
+{
+	const { normalizeAxis, axisTicks, defaultAxisSettings } = plotModel
+	const base = { ...defaultAxisSettings }
+	const log = normalizeAxis({ ...base, xLog: true, xMin: 0, xMax: 100 })
+	assert(log.xMin === 0.1, "A logarithmic axis gets a positive minimum", String(log.xMin))
+	const swapped = normalizeAxis({ ...base, yMin: 5, yMax: 1 })
+	assert(swapped.yMax > swapped.yMin, "The maximum is above the minimum")
+	const wide = axisTicks(normalizeAxis({ ...base, xLog: true, xMin: 1e-300, xMax: 1e300 }), "x")
+	assert(wide.major.length <= 12 && wide.minor.length === 0, "Many decades give few ticks", String(wide.major.length))
+	const dense = axisTicks({ ...base, xMin: 0, xMax: 1e6, xStep: 0.001 }, "x")
+	assert(dense.major.length < 60, "A tiny step is replaced", String(dense.major.length))
+}
+
+summary("Wires: joining two wires end to end")
+{
+	const { joinPaths } = await import(`${rootSrc}/utils/wireJoin.ts`)
+	const opposite = (d) => (d === "-|" ? "|-" : d === "|-" ? "-|" : "--")
+	const wire = (pts, dirs, startArrow = false, endArrow = false) => ({
+		points: pts.map(([x, y]) => ({ x, y })),
+		directions: dirs,
+		startArrow,
+		endArrow,
+	})
+	const a = wire([[0, 0], [10, 0]], ["-|"])
+	const b = wire([[10, 0], [10, 20]], ["|-"])
+	const plain = joinPaths(a, b, opposite)
+	assert(plain && plain.path.points.length === 3 && eqDeep(plain.path.directions, ["-|", "|-"]), "End meets start")
+	const flipped = joinPaths(a, wire([[10, 20], [10, 0]], ["-|"]), opposite)
+	assert(flipped && flipped.secondReversed && eqDeep(flipped.path.directions, ["-|", "|-"]), "End meets end: second is reversed", JSON.stringify(flipped))
+	const front = joinPaths(wire([[10, 0], [0, 0]], ["-|"]), b, opposite)
+	assert(front && front.firstReversed && front.path.points[0].x === 0, "Start meets start: first is reversed")
+	const swapped = joinPaths(wire([[10, 20], [10, 0]], ["|-"]), wire([[10, 0], [0, 0]], ["-|"]), opposite)
+	assert(swapped && !swapped.firstReversed && swapped.path.points.length === 3, "Start meets end")
+	assert(joinPaths(a, wire([[11, 0], [20, 0]], ["--"]), opposite) === null, "Wires which do not touch")
+	assert(joinPaths(wire([[0, 0], [10, 0]], ["-|"], false, true), b, opposite) === null, "Arrow where they touch")
+	const arrows = joinPaths(wire([[0, 0], [10, 0]], ["-|"], true), wire([[10, 0], [10, 20]], ["|-"], false, true), opposite)
+	assert(arrows && arrows.path.startArrow && arrows.path.endArrow, "Outer arrows are kept")
+	const arrowsSwapped = joinPaths(wire([[0, 0], [10, 0]], ["-|"], true), wire([[10, 20], [10, 0]], ["-|"], true, false), opposite)
+	assert(arrowsSwapped && arrowsSwapped.path.startArrow && arrowsSwapped.path.endArrow, "Arrows follow a reversed wire")
 }
 
 // --- Done -------------------------------------------------------------------------------- //

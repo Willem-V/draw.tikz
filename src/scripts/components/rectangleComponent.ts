@@ -28,12 +28,15 @@ import {
 	Undo,
 	MainController,
 } from "../internal"
+import { paletteNameOf, resolveColor } from "../utils/palette"
 import { HintBar } from "../utils/hintBar"
 import { pointInsideRect, rectRectIntersection, roundTikz, selectionSize } from "../utils/selectionHelper"
 
 export type RectangleSaveObject = ShapeSaveObject & {
 	text?: Text
 	array?: ArrayInfo
+	/** rounded corners, e.g. "3pt" */
+	cornerRadius?: string
 }
 
 /**
@@ -70,6 +73,8 @@ export type Text = {
 	fontSize?: string
 	innerSep?: SVG.Number
 	color?: string | "default"
+	/** the entry of the palette of the drawing the color comes from */
+	palette?: string
 	showPlaceholderText?: boolean
 	useHyphenation?: boolean
 }
@@ -118,6 +123,7 @@ export class RectangleComponent extends ShapeComponent {
 	private arrayLayers: SliderProperty
 	private arrayOffset: SliderProperty
 	private arrayVisualization: SVG.Path
+	private cornerRadius: SliderProperty
 
 	public constructor(createAsText: boolean = false) {
 		super()
@@ -141,6 +147,19 @@ export class RectangleComponent extends ShapeComponent {
 		this.visualization.add(this.componentVisualization)
 
 		this.visualization.add(this.dragElement)
+
+		this.cornerRadius = new SliderProperty(
+			"Rounded corners",
+			0,
+			30,
+			0.5,
+			new SVG.Number(0, "pt"),
+			undefined,
+			"Radius of the corners",
+			"corner:radius"
+		)
+		this.cornerRadius.addChangeListener(() => this.update())
+		this.properties.add(PropertyCategories.options, this.cornerRadius)
 
 		this.properties.add(PropertyCategories.options, new SectionHeaderProperty("Array", undefined, "array:header"))
 		this.arrayProperty = new BooleanProperty(
@@ -449,6 +468,9 @@ export class RectangleComponent extends ShapeComponent {
 		} else {
 			this.dragElement.attr({ fill: "transparent", stroke: "none" })
 		}
+		const radius = this.cornerRadius.value.convertToUnit("px").value
+		;(this.componentVisualization as SVG.Rect).radius(radius)
+		this.dragElement.radius(radius)
 		this.updateArray()
 		this.updateText()
 	}
@@ -553,6 +575,9 @@ export class RectangleComponent extends ShapeComponent {
 		const data = super.toJson() as RectangleSaveObject
 		data.type = RectangleComponent.jsonID
 		data.size = this.size.simplifyForJson()
+		if (this.cornerRadius.value.value > 0) {
+			data.cornerRadius = this.cornerRadius.value.toString()
+		}
 
 		if (!this.textAreaProperty.value && this.textAreaPlaceHolder.value) {
 			// save placeholder text state even if the text area is empty
@@ -580,6 +605,7 @@ export class RectangleComponent extends ShapeComponent {
 				}
 				if (this.textColor.value) {
 					textData.color = this.textColor.value.toString()
+					textData.palette = paletteNameOf(this.textColor.value)
 				}
 				hasText = true
 			}
@@ -603,6 +629,7 @@ export class RectangleComponent extends ShapeComponent {
 
 	protected applyJson(saveObject: RectangleSaveObject): void {
 		super.applyJson(saveObject)
+		this.cornerRadius.value = new SVG.Number(saveObject.cornerRadius ?? "0pt")
 
 		if (saveObject.array) {
 			this.arrayProperty.value = true
@@ -658,7 +685,7 @@ export class RectangleComponent extends ShapeComponent {
 				this.textInnerSep.value = new SVG.Number("5pt")
 			}
 
-			this.textColor.value = saveObject.text.color ? new SVG.Color(saveObject.text.color) : null
+			this.textColor.value = resolveColor(saveObject.text.color, saveObject.text.palette)
 		}
 
 		this.update()
@@ -690,6 +717,9 @@ export class RectangleComponent extends ShapeComponent {
 	protected buildTikzCommand(command: TikzNodeCommand): void {
 		command.options.push("shape=rectangle")
 		super.buildTikzCommand(command)
+		if (this.cornerRadius.value.value > 0) {
+			command.options.push("rounded corners=" + this.cornerRadius.value.toString())
+		}
 
 		let strokeWidth = this.strokeInfo.width.convertToUnit("px").value
 

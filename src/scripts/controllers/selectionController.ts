@@ -183,8 +183,8 @@ export class SelectionController {
 
 	private updateSelectionWithRectangle() {
 		let selectionBox = this.selectionRectangle.bbox()
-		let components = MainController.instance.circuitComponents.filter((comp) =>
-			comp.isInsideSelectionRectangle(selectionBox)
+		let components = MainController.instance.circuitComponents.filter(
+			(comp) => !comp.hidden && !comp.locked && comp.isInsideSelectionRectangle(selectionBox)
 		)
 		this.selectComponents(components, this.selectionMode)
 	}
@@ -193,7 +193,7 @@ export class SelectionController {
 		let selectionBox = this.selectionRectangle.bbox()
 		if (this.selectionMode == SelectionMode.RESET) {
 			for (const component of MainController.instance.circuitComponents) {
-				component.viewSelected(component.isInsideSelectionRectangle(selectionBox))
+				component.viewSelected(!component.hidden && !component.locked && component.isInsideSelectionRectangle(selectionBox))
 			}
 		} else if (this.selectionMode == SelectionMode.ADD) {
 			for (const component of MainController.instance.circuitComponents) {
@@ -233,6 +233,8 @@ export class SelectionController {
 	}
 
 	public selectComponents(components: CircuitComponent[], mode: SelectionMode) {
+		// hidden and locked components (layers) can not be selected
+		components = components.filter((component) => !component.hidden && !component.locked)
 		if (mode == SelectionMode.RESET) {
 			for (const component of MainController.instance.circuitComponents) {
 				component.isSelected = false

@@ -30,6 +30,14 @@ import {
 	ComponentSymbol,
 	ComponentSaveObject,
 	RectangleComponent,
+	BezierComponent,
+	ArcComponent,
+	TableComponent,
+	AxisComponent,
+	ImageComponent,
+	DimensionLineComponent,
+	BraceComponent,
+	chooseImageFile,
 	EllipseComponent,
 	defaultStroke,
 	defaultFill,
@@ -931,6 +939,16 @@ export class MainController {
 			}
 			return false
 		})
+		hotkeys("j", () => {
+			// join two selected wires which touch end to end into one wire
+			const selected = SelectionController.instance.currentlySelectedComponents
+			if (selected.length == 2 && selected[0] instanceof WireComponent && selected[1] instanceof WireComponent) {
+				if (selected[0].joinWith(selected[1])) {
+					Undo.addState()
+				}
+			}
+			return false
+		})
 		hotkeys("t", () => {
 			this.switchMode(Modes.DRAG_PAN)
 			ComponentPlacer.instance.placeComponent(new RectangleComponent(true))
@@ -1145,6 +1163,180 @@ export class MainController {
 				color: defaultStroke,
 				width: 1,
 			})
+		}
+		//Add dimension line, brace
+		for (const entry of [
+			{
+				title: "Dimension line",
+				search: "dimension measure length arrow double arrow size",
+				create: () => new DimensionLineComponent(),
+				icon: (svgIcon: SVG.Svg) => {
+					const stroke = { color: defaultStroke, width: 1 }
+					svgIcon.line(2, 3, 2, 11).stroke(stroke)
+					svgIcon.line(15, 3, 15, 11).stroke(stroke)
+					svgIcon.line(2, 7, 15, 7).stroke(stroke)
+					svgIcon.polygon([2, 7, 5, 5.5, 5, 8.5]).fill(defaultStroke)
+					svgIcon.polygon([15, 7, 12, 5.5, 12, 8.5]).fill(defaultStroke)
+				},
+			},
+			{
+				title: "Brace",
+				search: "brace curly bracket group",
+				create: () => new BraceComponent(),
+				icon: (svgIcon: SVG.Svg) =>
+					svgIcon
+						.path("M 2 9 Q 2 6, 5 6 L 6.5 6 Q 8.5 6, 8.5 3 Q 8.5 6, 10.5 6 L 12 6 Q 15 6, 15 9")
+						.fill("none")
+						.stroke({ color: defaultStroke, width: 1 }),
+			},
+		]) {
+			const addButton: HTMLDivElement = accordionItemBody.appendChild(document.createElement("div"))
+			addButton.classList.add("libComponent")
+			addButton.setAttribute("searchData", entry.search)
+			addButton.ariaRoleDescription = "button"
+			addButton.title = entry.title
+
+			const listener = (ev: MouseEvent) => {
+				ev.preventDefault()
+				this.switchMode(Modes.DRAG_PAN)
+				ComponentPlacer.instance.placeComponent(entry.create())
+				leftOffcanvasOC.hide()
+			}
+
+			addButton.addEventListener("mouseup", listener)
+			addButton.addEventListener("touchstart", listener, { passive: false })
+
+			let svgIcon = SVG.SVG().addTo(addButton)
+			svgIcon.viewbox(0, 0, 17, 12)
+			entry.icon(svgIcon)
+		}
+		//Add image
+		{
+			const addButton: HTMLDivElement = accordionItemBody.appendChild(document.createElement("div"))
+			addButton.classList.add("libComponent")
+			addButton.setAttribute("searchData", "image picture photo png jpg svg logo graphic")
+			addButton.ariaRoleDescription = "button"
+			addButton.title = "Image"
+
+			const listener = async (ev: MouseEvent) => {
+				ev.preventDefault()
+				leftOffcanvasOC.hide()
+				const file = await chooseImageFile()
+				if (!file) return
+				try {
+					const component = await ImageComponent.fromFile(file)
+					this.switchMode(Modes.DRAG_PAN)
+					ComponentPlacer.instance.placeComponent(component)
+				} catch (e) {
+					alert((e as Error).message)
+				}
+			}
+
+			addButton.addEventListener("mouseup", listener)
+
+			let svgIcon = SVG.SVG().addTo(addButton)
+			svgIcon.viewbox(0, 0, 17, 12)
+			const stroke = { color: defaultStroke, width: 1 }
+			svgIcon.rect(15, 10).move(1, 1).fill("none").stroke(stroke)
+			svgIcon.path("M 2 10 L 6 5 L 9 8 L 11 6 L 15 10").fill("none").stroke(stroke)
+			svgIcon.circle(2.5).center(12, 4).fill(defaultStroke)
+		}
+		//Add axes with plots
+		{
+			const addButton: HTMLDivElement = accordionItemBody.appendChild(document.createElement("div"))
+			addButton.classList.add("libComponent")
+			addButton.setAttribute("searchData", "axis axes plot graph chart function diagram data")
+			addButton.ariaRoleDescription = "button"
+			addButton.title = "Axes and plot"
+
+			const listener = (ev: MouseEvent) => {
+				ev.preventDefault()
+				this.switchMode(Modes.DRAG_PAN)
+				ComponentPlacer.instance.placeComponent(new AxisComponent())
+				leftOffcanvasOC.hide()
+			}
+
+			addButton.addEventListener("mouseup", listener)
+			addButton.addEventListener("touchstart", listener, { passive: false })
+
+			let svgIcon = SVG.SVG().addTo(addButton)
+			svgIcon.viewbox(0, 0, 17, 12)
+			const stroke = { color: defaultStroke, width: 1 }
+			svgIcon.path("M 2 1 L 2 10 L 16 10").fill("none").stroke(stroke)
+			svgIcon.path("M 3 9 C 6 9, 7 2, 15 2").fill("none").stroke({ color: "var(--bs-cyan)", width: 1 })
+		}
+		//Add table
+		{
+			const addButton: HTMLDivElement = accordionItemBody.appendChild(document.createElement("div"))
+			addButton.classList.add("libComponent")
+			addButton.setAttribute("searchData", "table grid cells matrix")
+			addButton.ariaRoleDescription = "button"
+			addButton.title = "Table"
+
+			const listener = (ev: MouseEvent) => {
+				ev.preventDefault()
+				this.switchMode(Modes.DRAG_PAN)
+				ComponentPlacer.instance.placeComponent(new TableComponent())
+				leftOffcanvasOC.hide()
+			}
+
+			addButton.addEventListener("mouseup", listener)
+			addButton.addEventListener("touchstart", listener, { passive: false })
+
+			let svgIcon = SVG.SVG().addTo(addButton)
+			svgIcon.viewbox(0, 0, 17, 12)
+			const stroke = { color: defaultStroke, width: 1 }
+			svgIcon.rect(15, 10).move(1, 1).fill("none").stroke(stroke)
+			svgIcon.line(1, 5, 16, 5).stroke(stroke)
+			svgIcon.line(6, 1, 6, 11).stroke(stroke)
+			svgIcon.line(11, 1, 11, 11).stroke(stroke)
+		}
+		//Add curves, arcs
+		for (const entry of [
+			{
+				title: "Curve",
+				search: "curve bezier spline path smooth",
+				create: () => new BezierComponent(),
+				icon: (svgIcon: SVG.Svg) =>
+					svgIcon.path("M 1 10 C 5 -4, 10 18, 16 2").fill("none").stroke({ color: defaultStroke, width: 1 }),
+			},
+			{
+				title: "Free-hand curve",
+				search: "free hand freehand draw pencil curve sketch",
+				create: () => new BezierComponent(true),
+				icon: (svgIcon: SVG.Svg) =>
+					svgIcon
+						.path("M 1 8 C 3 2, 5 2, 7 7 S 11 12, 16 4")
+						.fill("none")
+						.stroke({ color: defaultStroke, width: 1, dasharray: "2 1.5" }),
+			},
+			{
+				title: "Arc",
+				search: "arc circle segment pie",
+				create: () => new ArcComponent(),
+				icon: (svgIcon: SVG.Svg) =>
+					svgIcon.path("M 15 8 A 6 6 0 0 0 3 4").fill("none").stroke({ color: defaultStroke, width: 1 }),
+			},
+		]) {
+			const addButton: HTMLDivElement = accordionItemBody.appendChild(document.createElement("div"))
+			addButton.classList.add("libComponent")
+			addButton.setAttribute("searchData", entry.search)
+			addButton.ariaRoleDescription = "button"
+			addButton.title = entry.title
+
+			const listener = (ev: MouseEvent) => {
+				ev.preventDefault()
+				this.switchMode(Modes.DRAG_PAN)
+				ComponentPlacer.instance.placeComponent(entry.create())
+				leftOffcanvasOC.hide()
+			}
+
+			addButton.addEventListener("mouseup", listener)
+			addButton.addEventListener("touchstart", listener, { passive: false })
+
+			let svgIcon = SVG.SVG().addTo(addButton)
+			svgIcon.viewbox(0, 0, 17, 12)
+			entry.icon(svgIcon)
 		}
 		//Add Ellipse
 		{

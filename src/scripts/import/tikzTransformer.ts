@@ -55,6 +55,7 @@ import type { ComponentSaveObject, PositionedLabel } from "../internal"
 export type AnchorResolver = (component: ComponentSaveObject, anchor: string) => { x: number; y: number } | undefined
 
 export function transformTikz(sourceText: string, resolveAnchor?: AnchorResolver): ImportResult {
+	definedColors = readColorDefinitions(sourceText)
 	const collector = new DiagnosticsCollector(sourceText)
 	const doc = parseTikz(sourceText, collector)
 	const ctx = new TransformContext(collector, resolveAnchor)
@@ -878,6 +879,26 @@ function strokeStyleKey(entries: TikzOption[], lineWidthPx: number): string | un
 	)?.key
 }
 
+/** the colors of the \definecolor commands of the source (as exported for the palette of the app) */
+let definedColors = new Map<string, string>()
+
+function readColorDefinitions(source: string): Map<string, string> {
+	const colors = new Map<string, string>()
+	const pattern = /\\definecolor\s*\{([^}]+)\}\s*\{(RGB|rgb|HTML)\}\s*\{([^}]+)\}/g
+	for (const match of source.matchAll(pattern)) {
+		const name = match[1].trim()
+		const values = match[3].split(",").map((v) => v.trim())
+		if (match[2] == "HTML") {
+			if (/^[0-9a-f]{6}$/i.test(values[0])) colors.set(name, "#" + values[0].toLowerCase())
+		} else if (values.length == 3 && values.every((v) => v !== "" && !isNaN(Number(v)))) {
+			const scale = match[2] == "RGB" ? 1 : 255
+			const [r, g, b] = values.map((v) => Math.round(Number(v) * scale))
+			colors.set(name, `rgb(${r}, ${g}, ${b})`)
+		}
+	}
+	return colors
+}
+
 /**
  * a css color for a TikZ color: `{rgb,255:red,10;green,20;blue,30}` (as exported by the app) or a plain color name like
  * `red`. Mixed colors like `red!50` are not supported.
@@ -885,6 +906,8 @@ function strokeStyleKey(entries: TikzOption[], lineWidthPx: number): string | un
 function colorFromTikz(value: string | undefined): string | undefined {
 	if (!value) return undefined
 	const text = value.trim().replace(/^\{|\}$/g, "")
+	const defined = definedColors.get(text)
+	if (defined) return defined
 	const rgb = /^rgb\s*,\s*255\s*:\s*red\s*,\s*(\d+)\s*;\s*green\s*,\s*(\d+)\s*;\s*blue\s*,\s*(\d+)$/.exec(text)
 	if (rgb) return `rgb(${rgb[1]}, ${rgb[2]}, ${rgb[3]})`
 	return /^[a-z]+$/i.test(text) ? text.toLowerCase() : undefined

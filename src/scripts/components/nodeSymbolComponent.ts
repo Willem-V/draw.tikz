@@ -1139,7 +1139,7 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 
 	protected buildTikzCommand(command: TikzNodeCommand): void {
 		command.options.push(...this.referenceSymbol.optionsToStringArray(this.optionsFromProperties()))
-		command.options.push(...this.lineWidthTikzOptions())
+		command.options.push(...this.lineWidthTikzOptions(), ...this.symbolColorTikzOptions())
 		if (this.shapeKind == "port") {
 			const key = "/tikz/circuitikz/tripoles/" + this.referenceSymbol.tikzName
 			if (this.shapeSize.width.value.value != defaultPortWidth) {

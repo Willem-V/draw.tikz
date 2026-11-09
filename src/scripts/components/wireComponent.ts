@@ -13,6 +13,7 @@ import {
 	SaveController,
 	SectionHeaderProperty,
 	SelectionController,
+	SelectionMode,
 	SnappingInfo,
 	SnapPoint,
 	Strokable,
@@ -21,6 +22,7 @@ import {
 } from "../internal"
 import { AdjustDragHandler } from "../snapDrag/dragHandlers"
 import { WireMode, WireModes } from "../utils/wireModes"
+import { joinPaths, JoinPath } from "../utils/wireJoin"
 import {
 	lineRectIntersection,
 	pointInsideRect,
@@ -361,7 +363,11 @@ export class WireComponent extends Strokable(PathComponent) {
 					},
 					dragEnd: () => {
 						this.update()
-						return !this.referencePoints[index].eq(startPos)
+						const moved = !this.referencePoints[index].eq(startPos)
+						if (moved && (index == 0 || index == this.referencePoints.length - 1)) {
+							WireComponent.autoJoin(this)
+						}
+						return moved
 					},
 				})
 			}
@@ -775,6 +781,97 @@ export class WireComponent extends Strokable(PathComponent) {
 		this.placeMove(pos)
 
 		return false
+	}
+
+	// ---- joining wires ----
+
+	/** the geometry and arrows of this wire for {@link joinPaths} */
+	private joinPath(): JoinPath<WireDirection> {
+		return {
+			points: this.referencePoints.map((point) => ({ x: point.x, y: point.y })),
+			directions: this.wireDirections.slice(),
+			startArrow: this.arrowStartChoice.value.key !== defaultArrowTip.key,
+			endArrow: this.arrowEndChoice.value.key !== defaultArrowTip.key,
+		}
+	}
+
+	/** both wires are drawn the same way, so that they look the same as one wire */
+	private sameStrokeAs(other: WireComponent): boolean {
+		const a = this.strokeInfo
+		const b = other.strokeInfo
+		return (
+			a.color == b.color &&
+			(a.palette ?? "") == (b.palette ?? "") &&
+			a.opacity == b.opacity &&
+			(a.style ?? "") == (b.style ?? "") &&
+			Math.abs(a.width.convertToUnit("pt").value - b.width.convertToUnit("pt").value) < 1e-6
+		)
+	}
+
+	/**
+	 * Joins `other` to this wire if they touch end to end, so that the corner is drawn as one line instead of two flat ends.
+	 * This wire is kept (it can end up reversed), `other` is removed. Wires with a different stroke, or with an arrow
+	 * where they touch, are not joined.
+	 * @returns whether the wires were joined
+	 */
+	public joinWith(other: WireComponent): boolean {
+		if (other === this || !this.finishedPlacing || !other.finishedPlacing || !this.sameStrokeAs(other)) {
+			return false
+		}
+		const joined = joinPaths(this.joinPath(), other.joinPath(), oppositeDirection)
+		if (!joined) {
+			return false
+		}
+		const arrowStart = (wire: WireComponent, reversed: boolean) =>
+			reversed ? wire.arrowEndChoice.value : wire.arrowStartChoice.value
+		const arrowEnd = (wire: WireComponent, reversed: boolean) =>
+			reversed ? wire.arrowStartChoice.value : wire.arrowEndChoice.value
+		const newStartArrow = arrowStart(this, joined.firstReversed)
+		const newEndArrow = arrowEnd(other, joined.secondReversed)
+
+		const wasResizing = this.isResizing
+		this.resizable(false)
+		this.referencePoints = joined.path.points.map((point) => new SVG.Point(point.x, point.y))
+		this.wireDirections = joined.path.directions
+		this.onlyStraight = this.onlyStraight && other.onlyStraight
+		this.arrowStartChoice.value = newStartArrow
+		this.arrowEndChoice.value = newEndArrow
+
+		if (other.isSelected) {
+			SelectionController.instance.selectComponents([this], SelectionMode.RESET)
+		}
+		MainController.instance.removeComponent(other)
+		this.update()
+		if (wasResizing) {
+			this.resizable(true)
+		}
+		return true
+	}
+
+	/**
+	 * Joins a wire whose end was just placed or dragged to the wire it ends on, as long as only these two wires meet at
+	 * that point: another wire, a component or a node there means a junction, which has to stay separate.
+	 * @returns whether the wire was joined to another one
+	 */
+	public static autoJoin(wire: WireComponent): boolean {
+		let joinedAny = false
+		let joined = true
+		while (joined) {
+			joined = false
+			for (const end of [wire.referencePoints.at(0), wire.referencePoints.at(-1)]) {
+				const touching = MainController.instance.circuitComponents.filter(
+					(component) =>
+						component !== wire &&
+						component.snappingPoints?.some((snapPoint) => Math.hypot(snapPoint.x - end.x, snapPoint.y - end.y) < 0.01)
+				)
+				if (touching.length == 1 && touching[0] instanceof WireComponent && wire.joinWith(touching[0])) {
+					joined = true
+					joinedAny = true
+					break
+				}
+			}
+		}
+		return joinedAny
 	}
 
 	public placeFinish(): void {
