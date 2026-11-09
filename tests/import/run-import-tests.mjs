@@ -415,6 +415,34 @@ summary("Plots: unusable limits")
 	assert(dense.major.length < 60, "A tiny step is replaced", String(dense.major.length))
 }
 
+summary("Wires: joining two wires end to end")
+{
+	const { joinPaths } = await import(`${rootSrc}/utils/wireJoin.ts`)
+	const opposite = (d) => (d === "-|" ? "|-" : d === "|-" ? "-|" : "--")
+	const wire = (pts, dirs, startArrow = false, endArrow = false) => ({
+		points: pts.map(([x, y]) => ({ x, y })),
+		directions: dirs,
+		startArrow,
+		endArrow,
+	})
+	const a = wire([[0, 0], [10, 0]], ["-|"])
+	const b = wire([[10, 0], [10, 20]], ["|-"])
+	const plain = joinPaths(a, b, opposite)
+	assert(plain && plain.path.points.length === 3 && eqDeep(plain.path.directions, ["-|", "|-"]), "End meets start")
+	const flipped = joinPaths(a, wire([[10, 20], [10, 0]], ["-|"]), opposite)
+	assert(flipped && flipped.secondReversed && eqDeep(flipped.path.directions, ["-|", "|-"]), "End meets end: second is reversed", JSON.stringify(flipped))
+	const front = joinPaths(wire([[10, 0], [0, 0]], ["-|"]), b, opposite)
+	assert(front && front.firstReversed && front.path.points[0].x === 0, "Start meets start: first is reversed")
+	const swapped = joinPaths(wire([[10, 20], [10, 0]], ["|-"]), wire([[10, 0], [0, 0]], ["-|"]), opposite)
+	assert(swapped && !swapped.firstReversed && swapped.path.points.length === 3, "Start meets end")
+	assert(joinPaths(a, wire([[11, 0], [20, 0]], ["--"]), opposite) === null, "Wires which do not touch")
+	assert(joinPaths(wire([[0, 0], [10, 0]], ["-|"], false, true), b, opposite) === null, "Arrow where they touch")
+	const arrows = joinPaths(wire([[0, 0], [10, 0]], ["-|"], true), wire([[10, 0], [10, 20]], ["|-"], false, true), opposite)
+	assert(arrows && arrows.path.startArrow && arrows.path.endArrow, "Outer arrows are kept")
+	const arrowsSwapped = joinPaths(wire([[0, 0], [10, 0]], ["-|"], true), wire([[10, 20], [10, 0]], ["-|"], true, false), opposite)
+	assert(arrowsSwapped && arrowsSwapped.path.startArrow && arrowsSwapped.path.endArrow, "Arrows follow a reversed wire")
+}
+
 // --- Done -------------------------------------------------------------------------------- //
 
 console.log(`\n${passes} passed, ${failures} failed`)

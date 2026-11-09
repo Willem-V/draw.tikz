@@ -1,4 +1,4 @@
-import { MainController, Modes, SelectionController } from "../internal"
+import { MainController, Modes, SelectionController, WireComponent } from "../internal"
 
 export type KeyHint = {
 	/** the text of the key, e.g. "Space" */
@@ -44,7 +44,12 @@ export class HintBar {
 		}
 		const selected = SelectionController.instance.currentlySelectedComponents.length
 		if (selected > 0 && MainController.instance.mode == Modes.DRAG_PAN) {
-			HintBar.render(`${selected} selected`, "", transformHints())
+			const components = SelectionController.instance.currentlySelectedComponents
+			const hints = transformHints()
+			if (selected == 2 && components.every((component) => component instanceof WireComponent)) {
+				hints.push({ key: "J", action: "join wires" })
+			}
+			HintBar.render(`${selected} selected`, "", hints)
 		} else if (MainController.instance.mode == Modes.DRAG_PAN) {
 			HintBar.render("Ready", "", idleHints())
 		} else {

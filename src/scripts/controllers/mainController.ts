@@ -939,6 +939,16 @@ export class MainController {
 			}
 			return false
 		})
+		hotkeys("j", () => {
+			// join two selected wires which touch end to end into one wire
+			const selected = SelectionController.instance.currentlySelectedComponents
+			if (selected.length == 2 && selected[0] instanceof WireComponent && selected[1] instanceof WireComponent) {
+				if (selected[0].joinWith(selected[1])) {
+					Undo.addState()
+				}
+			}
+			return false
+		})
 		hotkeys("t", () => {
 			this.switchMode(Modes.DRAG_PAN)
 			ComponentPlacer.instance.placeComponent(new RectangleComponent(true))

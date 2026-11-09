@@ -11,6 +11,7 @@ import {
 	SnapController,
 	SnapCursorController,
 	Undo,
+	WireComponent,
 } from "../internal"
 import hotkeys from "hotkeys-js"
 import { HintBar, transformHints } from "../utils/hintBar"
@@ -106,6 +107,9 @@ export class ComponentPlacer {
 	public placeFinish(ev: Event) {
 		if (this.component) {
 			this.component.placeFinish()
+			if (this.component instanceof WireComponent && MainController.instance.circuitComponents.includes(this.component)) {
+				WireComponent.autoJoin(this.component)
+			}
 			this.cleanUp()
 			Undo.addState()
 
