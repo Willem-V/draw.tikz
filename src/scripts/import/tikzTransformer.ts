@@ -713,17 +713,57 @@ function transformSingleNode(stmt: NodeStatement, ctx: TransformContext): Compon
 	if (shapeSave) return [shapeSave]
 
 	// Fall-back: a plain node with a label renders as a rectangle with text.
-	const textContent = stmt.label ?? ""
+	return [buildTextNodeSave(stmt.label ?? "", stmt.name, pos, stmt.options?.entries ?? [])]
+}
+
+/** the anchor of a node (a point of the node, which is put on its position) for the placement keys `below`, `above left`, ... */
+const PLACEMENT_ANCHORS: Record<string, string> = {
+	"below": "north",
+	"above": "south",
+	"left": "east",
+	"right": "west",
+	"below left": "north east",
+	"below right": "north west",
+	"above left": "south east",
+	"above right": "south west",
+}
+
+/**
+ * a node without a shape, e.g. a text: a rectangle with the text and no border (unless the node is drawn), placed so
+ * the anchor of the node is at its position
+ */
+function buildTextNodeSave(
+	text: string,
+	name: string | undefined,
+	pos: { x: number; y: number },
+	entries: TikzOption[]
+): ComponentSaveObject {
+	const size = { x: estimateTextWidthPx(text), y: 24 }
+	const anchor =
+		entries.find((e) => e.key === "anchor")?.value?.trim() ??
+		PLACEMENT_ANCHORS[entries.find((e) => e.value === undefined && e.key in PLACEMENT_ANCHORS)?.key ?? ""] ??
+		"center"
+	// the center of the node is half its size away from the anchor (y points down in the app)
+	const shift = {
+		x:
+			anchor.includes("west") ? size.x / 2
+			: anchor.includes("east") ? -size.x / 2
+			: 0,
+		y:
+			anchor.includes("north") ? size.y / 2
+			: anchor.includes("south") ? -size.y / 2
+			: 0,
+	}
+	const drawn = entries.some((e) => e.key === "draw")
 	const save: any = {
 		type: "rect",
-		position: pos,
-		size: { x: estimateTextWidthPx(textContent), y: 24 },
+		position: { x: pos.x + shift.x, y: pos.y + shift.y },
+		size,
+		stroke: drawn ? strokeFromOptions(entries) : { opacity: 0 },
 	}
-	if (stmt.name) save.name = stmt.name
-	if (textContent.length > 0) {
-		save.text = { text: textContent }
-	}
-	return [save as ComponentSaveObject]
+	if (name) save.name = name
+	if (text.length > 0) save.text = { text: latexToPlainText(text) }
+	return save as ComponentSaveObject
 }
 
 /**
@@ -1035,16 +1075,8 @@ function buildEmbeddedNodeSave(
 			return save
 		}
 	}
-	// Fallback — a labelled rectangle.
-	const text = el.label ?? ""
-	const save: any = {
-		type: "rect",
-		position: pos,
-		size: { x: estimateTextWidthPx(text), y: 24 },
-	}
-	if (el.name) save.name = el.name
-	if (text.length > 0) save.text = { text }
-	return save as ComponentSaveObject
+	// Fallback — a text
+	return buildTextNodeSave(el.label ?? "", el.name, pos, el.options?.entries ?? [])
 }
 
 // ===================================================================================== //

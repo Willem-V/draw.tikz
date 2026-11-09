@@ -60,7 +60,13 @@ export function tokenizeTikz(source: string, collector: DiagnosticsCollector): T
 	let line = 1
 	let col = 1
 
-	const push = (type: TikzTokenType, start: number, startLine: number, startCol: number, parsed?: TikzToken["parsed"]) => {
+	const push = (
+		type: TikzTokenType,
+		start: number,
+		startLine: number,
+		startCol: number,
+		parsed?: TikzToken["parsed"]
+	) => {
 		tokens.push({
 			type,
 			value: source.slice(start, i),
@@ -270,9 +276,11 @@ export function tokenizeTikz(source: string, collector: DiagnosticsCollector): T
 		// modifiers like `i^=$I_C$` and `v^=$V_R$` (current/voltage label-above idioms) tokenize
 		// cleanly as a single IDENTIFIER rather than triggering an ILLEGAL-char warning. The `_`
 		// counterpart (`i_=...`) already rides along because `_` is in the base charset.
-		if (/[A-Za-z_@]/.test(ch)) {
+		// A slash is part of a pgfkeys path (`transistors/arrow pos`, `/tikz/circuitikz/bipoles/length`), so the whole path is one
+		// identifier. A path can also start with the slash.
+		if (/[A-Za-z_@/]/.test(ch)) {
 			advance()
-			while (i < source.length && /[A-Za-z0-9_@^]/.test(source[i])) advance()
+			while (i < source.length && /[A-Za-z0-9_@^/]/.test(source[i])) advance()
 			// A trailing dash is allowed only when followed by another identifier char, to keep
 			// operators like "--" from being absorbed.
 			while (i + 1 < source.length && source[i] === "-" && /[A-Za-z0-9_^]/.test(source[i + 1])) {
