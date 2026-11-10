@@ -1022,6 +1022,15 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 		}
 	}
 
+	/** the symbol is scaled by the matrix, which would scale its strokes too (LaTeX keeps the line width) */
+	protected strokeCompensation(): number {
+		if (!this.scaleState) {
+			return 1
+		}
+		const scale = Math.sqrt(Math.abs(this.scaleState.x * this.scaleState.y))
+		return scale > 1e-6 ? 1 / scale : 1
+	}
+
 	public update() {
 		// changing the transistor setting of the drawing also changes the transistors which are already placed
 		if (this.componentVariant && this.resolvedStyle() != this.appliedStyle) {
@@ -1043,6 +1052,7 @@ export class NodeSymbolComponent extends SymbolLineWidth(NodeComponent) {
 			this.componentVisualization.node.setAttribute("href", symbolHref)
 		}
 		this.componentVisualization.transform(m)
+		this.updateLineWidth()
 		this._bbox = this.componentVariant.viewBox.transform(m)
 
 		this.updatePositionedLabel()

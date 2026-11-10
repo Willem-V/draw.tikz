@@ -679,7 +679,8 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 		const [start, end] = this.variableArrowPoints()
 		const dir = end.sub(start).div(end.sub(start).abs())
 		const normal = new SVG.Point(-dir.y, dir.x)
-		const strokeWidth = this.symbolStrokeWidth()
+		// the arrow is transformed with the symbol, LaTeX keeps its line width when scaling
+		const strokeWidth = this.symbolStrokeWidth() * this.strokeCompensation()
 		// approximately the size of the tikz "latex" arrow tip, which grows with the line width
 		const tipLength = 2.5 + 2.5 * strokeWidth
 		const tipWidth = 0.75 * tipLength
@@ -781,6 +782,15 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 		}
 	}
 
+	/** the symbol is scaled by the matrix, which would scale its strokes too (LaTeX keeps the line width) */
+	protected strokeCompensation(): number {
+		if (!this.scaleState) {
+			return 1
+		}
+		const scale = Math.sqrt(Math.abs(this.scaleState.x * this.scaleState.y))
+		return scale > 1e-6 ? 1 / scale : 1
+	}
+
 	public update(): void {
 		this.position = this.referencePoints[0].add(this.referencePoints[1]).div(2)
 
@@ -796,6 +806,7 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 		let m = this.getTransformMatrix()
 		this.componentVisualization.transform(m)
 		this.variableArrow?.transform(m)
+		this.updateLineWidth()
 
 		let startLineEndPoint = this.relSymbolStart.add(this.componentVariant.mid).transform(m)
 		let endLineStartPoint = this.relSymbolEnd.add(this.componentVariant.mid).transform(m)

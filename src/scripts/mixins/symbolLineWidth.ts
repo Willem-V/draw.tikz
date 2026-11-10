@@ -121,9 +121,21 @@ export function SymbolLineWidth<TBase extends AbstractConstructor<CircuitCompone
 			return [this.componentVisualization]
 		}
 
+		/**
+		 * SVG scales the strokes of a symbol with the symbol, LaTeX does not (a scaled symbol keeps its line width). The
+		 * factor which makes the stroke of the scaled symbol as wide as the line width, 1 for symbols which are not scaled
+		 */
+		protected strokeCompensation(): number {
+			return 1
+		}
+
 		protected updateLineWidth() {
+			if (!this.lineWidthProperty) {
+				return
+			}
+			const scale = this.lineScale * this.strokeCompensation()
 			for (const element of this.lineWidthElements()) {
-				element?.node.style.setProperty("--line-scale", this.lineScale.toString())
+				element?.node.style.setProperty("--line-scale", scale.toString())
 			}
 		}
 
