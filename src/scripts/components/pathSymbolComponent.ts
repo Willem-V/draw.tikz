@@ -1,3 +1,4 @@
+import { strokeCss, thickCorrection } from "../utils/strokeThickness"
 import * as SVG from "@svgdotjs/svg.js"
 import {
 	CanvasController,
@@ -379,7 +380,7 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 		const w = Math.max(this.blockSize.width.value.value, 0.01) * blockSizeUnit
 		const h = Math.max(this.blockSize.height.value.value, 0.01) * blockSizeUnit
 		const half = blockThickStroke / 2
-		const scaledStroke = (width: number) => `calc(var(--line-scale, 1) * ${width}px)`
+		const scaledStroke = strokeCss
 
 		this.blockSymbol.clear()
 		const g = this.blockSymbol.group().attr({ stroke: defaultStroke, "stroke-miterlimit": 10 })
@@ -645,7 +646,8 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 	private symbolStrokeWidth(): number {
 		let width = 0.53
 		for (const element of this.componentVariant.symbol.node.querySelectorAll("[stroke-width]")) {
-			width = Math.max(width, Number.parseFloat(element.getAttribute("stroke-width")) || 0)
+			const elementWidth = Number.parseFloat(element.getAttribute("stroke-width")) || 0
+			width = Math.max(width, elementWidth * thickCorrection(elementWidth))
 		}
 		return width * this.lineScale
 	}

@@ -12,6 +12,7 @@ import {
 import type { StrokeInfo } from "./strokable"
 import { roundTikz } from "../utils/selectionHelper"
 import { paletteNameOf, resolveColor } from "../utils/palette"
+import { isUniformStrokes, thickCorrection } from "../utils/strokeThickness"
 
 /**
  * the line width circuitikz uses for symbols by default (thin lines, thick lines are drawn twice as wide)
@@ -153,20 +154,22 @@ export function SymbolLineWidth<TBase extends AbstractConstructor<CircuitCompone
 				use.node.style.removeProperty("--line-scale")
 				const color = use.node.style.getPropertyValue(symbolColorVariable).trim()
 				use.node.style.removeProperty(symbolColorVariable)
+				const uniform = isUniformStrokes()
 				const exportId =
-					scale == 1 && !color ?
+					scale == 1 && !color && !uniform ?
 						id
 					:	id +
 						(scale == 1 ? "" : "_lw" + scale.toFixed(3).replace(".", "-")) +
+						(uniform ? "_u" : "") +
 						(color ? "_c" + color.replace("#", "") : "")
-				if ((scale == 1 && !color) || !defs.has(exportId)) {
+				if ((scale == 1 && !color && !uniform) || !defs.has(exportId)) {
 					const element = new SVG.Element(document.getElementById(id).cloneNode(true))
 					element.id(exportId)
 					for (const child of [element.node, ...element.node.querySelectorAll("[stroke-width]")]) {
 						const strokeWidth = Number.parseFloat(child.getAttribute("stroke-width"))
 						if (!Number.isNaN(strokeWidth)) {
 							;(child as SVGElement).style.removeProperty("stroke-width")
-							child.setAttribute("stroke-width", (strokeWidth * scale).toString())
+							child.setAttribute("stroke-width", (strokeWidth * thickCorrection(strokeWidth) * scale).toString())
 						}
 					}
 					if (color) {

@@ -1,3 +1,4 @@
+import { strokeCss } from "../utils/strokeThickness"
 import * as SVG from "@svgdotjs/svg.js"
 import { HintBar } from "../utils/hintBar"
 import { Button as _bootstrapButton, Collapse as _bootstrapCollapse, Offcanvas, Tooltip, Modal } from "bootstrap"
@@ -1784,7 +1785,9 @@ export class MainController {
 		for (const elem of [node, ...node.querySelectorAll("[stroke-width]")]) {
 			const strokeWidth = elem.getAttribute("stroke-width")
 			if (strokeWidth) {
-				;(elem as SVGElement).style.strokeWidth = `calc(var(--line-scale, 1) * ${strokeWidth}px)`
+				const width = Number.parseFloat(strokeWidth)
+				;(elem as SVGElement).style.strokeWidth =
+					Number.isNaN(width) ? `calc(var(--line-scale, 1) * ${strokeWidth}px)` : strokeCss(width)
 			}
 		}
 	}
