@@ -443,6 +443,18 @@ summary("Wires: joining two wires end to end")
 	assert(arrowsSwapped && arrowsSwapped.path.startArrow && arrowsSwapped.path.endArrow, "Arrows follow a reversed wire")
 }
 
+summary("Tables: cell lines and proportional columns")
+{
+	const { splitCellLines, proportionalSizes, cumulative } = await import(`${rootSrc}/utils/tableLayout.ts`)
+	assert(eqDeep(splitCellLines("one"), ["one"]), "A cell without break is one line")
+	assert(eqDeep(splitCellLines("a \\\\ b"), ["a", "b"]), "A double backslash breaks the line", JSON.stringify(splitCellLines("a \\\\ b")))
+	assert(eqDeep(splitCellLines("$\\substack{a \\\\ b}$ x"), ["$\\substack{a \\\\ b}$ x"]), "No break inside math")
+	assert(eqDeep(splitCellLines("5 \\$ \\\\ 6"), ["5 \\$", "6"]), "An escaped dollar does not start math")
+	assert(eqDeep(proportionalSizes([1, 3], 8), [2, 6]), "Sizes follow the weights")
+	assert(eqDeep(proportionalSizes([0, 0], 8), [4, 4]), "No weights: equal sizes")
+	assert(eqDeep(cumulative([2, 6]), [0, 2, 8]), "Cumulative positions")
+}
+
 // --- Done -------------------------------------------------------------------------------- //
 
 console.log(`\n${passes} passed, ${failures} failed`)

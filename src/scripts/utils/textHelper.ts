@@ -75,6 +75,46 @@ export function convertTextToNativeSVGText(text: Text, textBox: SVG.Box, useHyph
 	return layoutText(lines, text, textBox)
 }
 
+const measuredWidths = new Map<string, number>()
+
+/**
+ * the width in px of a text without wrapping, i.e. of its widest explicit line (lines are separated by \n). Math is
+ * measured as rendered. Used to size table columns to their content.
+ */
+export function measureTextWidth(text: string, fontSizeKey: string): number {
+	const key = fontSizeKey + "|" + text
+	const known = measuredWidths.get(key)
+	if (known !== undefined) {
+		return known
+	}
+	const fontSizept = fontSizes.find((fs) => fs.key == fontSizeKey).size
+	const fontSize = fontSizept.toString() + "pt"
+	const spaceWidth = getTextMetrics(" ", fontSize).width
+	const mathjaxParser = new MathjaxParser()
+	let widest = 0
+	for (const line of text.split("\n")) {
+		let lineWidth = 0
+		let elements = 0
+		for (const section of mathjaxParser.parse(line.trim())) {
+			const widths: number[] =
+				section.type == "inline" ?
+					[renderMathJax(section.text, fontSizept).width]
+				:	section.text
+						.split(/\s+/)
+						.filter((word) => word)
+						.map((word) => getTextMetrics(word, fontSize).width)
+			for (const width of widths) {
+				lineWidth += width
+				elements++
+			}
+		}
+		lineWidth += Math.max(0, elements - 1) * spaceWidth
+		widest = Math.max(widest, lineWidth)
+	}
+	measuredWidths.set(key, widest)
+	return widest
+}
+
 function layoutText(lines: LineInfo[], text: Text, textBox: SVG.Box): SVG.G {
 	const fontSizept = fontSizes.find((fs) => fs.key == text.fontSize).size
 	const fontSizepx = (fontSizept * 4) / 3

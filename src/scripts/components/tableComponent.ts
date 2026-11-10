@@ -30,6 +30,8 @@ import {
 	TikzPathCommand,
 } from "../internal"
 import { cellToLatex } from "../utils/latexText"
+import { cumulative, proportionalSizes, splitCellLines } from "../utils/tableLayout"
+import { measureTextWidth } from "../utils/textHelper"
 import { removeTextSVG } from "../utils/svgText"
 import { paletteNameOf, resolveColor } from "../utils/palette"
 import { rectRectIntersection, roundTikz } from "../utils/selectionHelper"
@@ -67,7 +69,8 @@ export function parseTableContent(content: string): string[][] {
 
 /**
  * A table: a grid of cells with text (and math), drawn with lines and exported as TikZ lines and nodes.
- * The width and height are distributed equally over the columns and rows, resize the table with the handles.
+ * The width is distributed over the columns in proportion to their content (the widest cell), the height over the rows in
+ * proportion to their number of lines (`\\` breaks a line in a cell). Resize the table with the handles. A cell wraps if its column is narrower than the text.
  */
 export class TableComponent extends ShapeComponent {
 	private static jsonID = "table"
@@ -111,7 +114,7 @@ export class TableComponent extends ShapeComponent {
 		this.properties.add(PropertyCategories.text, new SectionHeaderProperty("Table", undefined, "table:header"))
 		this.contentProperty = new TextAreaProperty(
 			defaultContent,
-			"One row per line, cells separated by &. Pasted spreadsheet cells (tabs) work too. $...$ is math",
+			"One row per line, cells separated by &. Pasted spreadsheet cells (tabs) work too. $...$ is math, \\\\ breaks the line in a cell",
 			"table:content"
 		)
 		this.contentProperty.addChangeListener(() => this.update())
@@ -186,22 +189,44 @@ export class TableComponent extends ShapeComponent {
 		return parseTableContent(this.contentProperty.value ?? "")
 	}
 
+	/** the widths of the columns in px: in proportion to the widest cell of each column */
+	private columnWidths(cells: string[][] = this.cells): number[] {
+		const padding = this.innerSepProperty.value.convertToUnit("px").value
+		const fontSize = this.fontSizeProperty.value.key
+		const weights = cells[0].map((_, column) =>
+			Math.max(
+				...cells.map((row) =>
+					row[column] ? measureTextWidth(splitCellLines(row[column]).join("\n"), fontSize) + 2 * padding : 0
+				)
+			)
+		)
+		return proportionalSizes(weights, this.size.x)
+	}
+
+	/** the heights of the rows in px: in proportion to the number of lines of each row */
+	private rowHeights(cells: string[][] = this.cells): number[] {
+		const weights = cells.map((row) => Math.max(1, ...row.map((cell) => splitCellLines(cell).length)))
+		return proportionalSizes(weights, this.size.y)
+	}
+
 	/** the lines between the cells in the local coordinates of the table (x and y from 0 to the size) */
 	private innerLines(): { from: SVG.Point; to: SVG.Point; header: boolean }[] {
 		const cells = this.cells
 		const rows = cells.length
 		const columns = cells[0].length
 		const lines: { from: SVG.Point; to: SVG.Point; header: boolean }[] = []
+		const rowStarts = cumulative(this.rowHeights(cells))
+		const columnStarts = cumulative(this.columnWidths(cells))
 		for (let row = 1; row < rows; row++) {
 			const header = row == 1 && this.headerProperty.value
 			if (header || this.horizontalProperty.value) {
-				const y = (this.size.y * row) / rows
+				const y = rowStarts[row]
 				lines.push({ from: new SVG.Point(0, y), to: new SVG.Point(this.size.x, y), header })
 			}
 		}
 		if (this.verticalProperty.value) {
 			for (let column = 1; column < columns; column++) {
-				const x = (this.size.x * column) / columns
+				const x = columnStarts[column]
 				lines.push({ from: new SVG.Point(x, 0), to: new SVG.Point(x, this.size.y), header: false })
 			}
 		}
@@ -244,8 +269,8 @@ export class TableComponent extends ShapeComponent {
 		const rows = cells.length
 		const columns = cells[0].length
 		const padding = this.innerSepProperty.value.convertToUnit("px").value
-		const cellWidth = this.size.x / columns
-		const cellHeight = this.size.y / rows
+		const columnStarts = cumulative(this.columnWidths(cells))
+		const rowStarts = cumulative(this.rowHeights(cells))
 		const origin = this.position.sub(this.size.div(2))
 		const group = new SVG.G()
 		const color = this.textColorProperty.value?.toString() || "var(--bs-emphasis-color)"
@@ -253,18 +278,18 @@ export class TableComponent extends ShapeComponent {
 			for (let column = 0; column < columns; column++) {
 				const text = cells[row][column]
 				if (!text) continue
-				const w = Math.max(0, cellWidth - 2 * padding)
-				const h = Math.max(0, cellHeight - 2 * padding)
+				const w = Math.max(0, columnStarts[column + 1] - columnStarts[column] - 2 * padding)
+				const h = Math.max(0, rowStarts[row + 1] - rowStarts[row] - 2 * padding)
 				const box = new SVG.Box(
-					origin.x + column * cellWidth + padding,
-					origin.y + row * cellHeight + padding,
+					origin.x + columnStarts[column] + padding,
+					origin.y + rowStarts[row] + padding,
 					w,
 					h
 				)
 				group.add(
 					convertTextToNativeSVGText(
 						{
-							text: text,
+							text: splitCellLines(text).join("\n"),
 							align: this.alignOfColumn(column),
 							justify: 0,
 							fontSize: this.fontSizeProperty.value.key,
@@ -394,8 +419,8 @@ export class TableComponent extends ShapeComponent {
 
 		// the text of the cells
 		const padding = this.innerSepProperty.value.convertToUnit("px").value
-		const cellWidth = this.size.x / columns
-		const cellHeight = this.size.y / rows
+		const columnStarts = cumulative(this.columnWidths(cells))
+		const rowStarts = cumulative(this.rowHeights(cells))
 		const fontString =
 			this.fontSizeProperty.value.key == defaultFontSize.key ? "" : `\\${this.fontSizeProperty.value.name} `
 		for (let row = 0; row < rows; row++) {
@@ -406,27 +431,33 @@ export class TableComponent extends ShapeComponent {
 					align == TextAlign.LEFT ? "west"
 					: align == TextAlign.RIGHT ? "east"
 					: "center"
+				const cellWidth = columnStarts[column + 1] - columnStarts[column]
 				const x =
-					(column +
-						(align == TextAlign.LEFT ? 0
-						: align == TextAlign.RIGHT ? 1
-						: 0.5)) *
-					cellWidth
+					columnStarts[column] +
+					(align == TextAlign.LEFT ? 0
+					: align == TextAlign.RIGHT ? cellWidth
+					: cellWidth / 2)
 				const local = new SVG.Point(
 					x +
 						(align == TextAlign.LEFT ? padding
 						: align == TextAlign.RIGHT ? -padding
 						: 0),
-					(row + 0.5) * cellHeight
+					(rowStarts[row] + rowStarts[row + 1]) / 2
 				)
-				let content = fontString + cellToLatex(cells[row][column])
+				const lines = splitCellLines(cells[row][column])
+				let content = fontString + lines.map((line) => cellToLatex(line)).join(" \\\\ ")
 				if (this.textColorProperty.value) {
 					content = "\\textcolor" + this.textColorProperty.value.toTikzString() + "{" + content + "}"
 				}
 				const options = [
 					"anchor=" + anchor,
 					"inner sep=0pt",
-					`text width=${roundTikz(new SVG.Number(Math.max(0, cellWidth - 2 * padding), "px").convertToUnit("cm").value)}cm`,
+					// only a text which does not fit its column wraps, a fitting one never does (the text width of LaTeX can differ a little from the preview)
+					...(measureTextWidth(lines.join("\n"), this.fontSizeProperty.value.key) > cellWidth - 2 * padding ?
+						[
+							`text width=${roundTikz(new SVG.Number(Math.max(0, cellWidth - 2 * padding), "px").convertToUnit("cm").value)}cm`,
+						]
+					:	[]),
 					align == TextAlign.LEFT ? "align=left"
 					: align == TextAlign.RIGHT ? "align=right"
 					: "align=center",
