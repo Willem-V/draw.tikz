@@ -3,6 +3,19 @@
 svg.mainCanvas {
 	width: 100%;
 	height: 100%;
+
+	// the drawing area is paper: white with black ink in both app themes, like the LaTeX output.
+	// Everything drawn in it uses these variables, so the default color, fills and text no longer flip with the theme
+	// while explicitly chosen colors stay as they are.
+	--bs-emphasis-color: #000;
+	--bs-body-color: #212529;
+	--bs-body-bg: #fff;
+	--bs-secondary-bg: #e9ecef;
+	--bs-secondary-color: rgba(33, 37, 41, 0.75);
+	--bs-secondary-text-emphasis: #2b2f32;
+	--bs-primary-text-emphasis: #052c65;
+	background-color: #fff;
+	color: #212529;
 }
 
 .pointerNone {
