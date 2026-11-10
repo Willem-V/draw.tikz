@@ -7,6 +7,7 @@ import {
 	PreviewChoiceProperty,
 	SectionHeaderProperty,
 } from "../internal"
+import { setUniformStrokes } from "../utils/strokeThickness"
 
 export type StylePreset = "default" | "american" | "european"
 
@@ -32,6 +33,7 @@ type OptionsChoice =
 	| "voltageConvention"
 	| "labelOrientation"
 	| "transistorArrows"
+	| "symbolThickness"
 
 type GlobalOption = {
 	key: OptionsChoice
@@ -164,6 +166,34 @@ const transistorArrowOption: GlobalOption = {
 	tikzDefault: "always",
 }
 
+/**
+ * CircuiTikZ draws the shapes of its components 2 (the T ground: 3) times as wide as the line width, so the wires connecting
+ * them are thinner than the components themselves
+ */
+const symbolThicknessOption: GlobalOption = {
+	key: "symbolThickness",
+	name: "Symbol line width",
+	tikz: "ctikzset",
+	choices: [
+		{
+			key: "equal",
+			name: "Same as the wires",
+			tikz: [
+				"bipoles/thickness=1",
+				"tripoles/thickness=1",
+				"quadpoles/thickness=1",
+				"multipoles/thickness=1",
+				"monopoles/ground/thickness=1",
+				"monopoles/rground/thickness=1",
+				"monopoles/tground/thickness=1",
+			].join(", "),
+		},
+		{ key: "double", name: "Twice the wires (CircuiTikZ default)", tikz: "bipoles/thickness=2" },
+	],
+	// circuitikz draws the symbols wider than the wires, so the setting is exported when they are drawn the same
+	tikzDefault: "double",
+}
+
 const STYLE_PRESETS: Record<StylePreset, Partial<Record<OptionsChoice, string>>> = {
 	default: {
 		voltages: "european",
@@ -174,6 +204,7 @@ const STYLE_PRESETS: Record<StylePreset, Partial<Record<OptionsChoice, string>>>
 		voltageConvention: "noold",
 		labelOrientation: "smart",
 		transistorArrows: "end",
+		symbolThickness: "equal",
 	},
 	american: {
 		// currents: "american",
@@ -220,6 +251,7 @@ export class EnvironmentVariableController {
 			voltageConventionOption,
 			labelOrientationOption,
 			transistorArrowOption,
+			symbolThicknessOption,
 		]
 
 		let defaults = STYLE_PRESETS["default"]
@@ -247,6 +279,7 @@ export class EnvironmentVariableController {
 
 			this.optionsMap.set(option.key, option)
 		}
+		setUniformStrokes(this.globalSettings.symbolThickness == "equal")
 	}
 
 	public getGlobalSettings(): GlobalTikzSettings {
@@ -257,6 +290,7 @@ export class EnvironmentVariableController {
 		for (const key of this.propertyMap.keys()) {
 			this.globalSettings[key as OptionsChoice] = this.propertyMap.get(key as OptionsChoice).value.key
 		}
+		setUniformStrokes(this.globalSettings.symbolThickness == "equal")
 		MainController.instance.circuitComponents.forEach((component) => {
 			component.update()
 		})
@@ -363,5 +397,6 @@ export class EnvironmentVariableController {
 				false
 			)
 		}
+		setUniformStrokes(this.globalSettings.symbolThickness == "equal")
 	}
 }

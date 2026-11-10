@@ -1,3 +1,4 @@
+import { strokeCss } from "../utils/strokeThickness"
 import * as SVG from "@svgdotjs/svg.js"
 import {
 	EnvironmentVariableController,
@@ -130,7 +131,7 @@ const pinSideInfo: Record<PinSide, { key: string; anchor: string }> = {
 
 type ShapeKind = "port" | MuxdemuxKind
 
-const scaledStroke = (width: number) => `calc(var(--line-scale, 1) * ${width}px)`
+const scaledStroke = strokeCss
 
 /**
  * a pin of a generated variant at the given symbol coordinates
