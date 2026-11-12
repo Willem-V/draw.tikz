@@ -80,6 +80,7 @@ export type PathSymbolSaveObject = PathSaveObject & {
 	options?: string[]
 	poles?: Pole
 	variable?: boolean
+	variableLength?: number
 	block?: BlockSaveObject
 }
 
@@ -157,6 +158,8 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 	 * only available for sources and the plain resistors, inductors and capacitors: draws a diagonal arrow over the symbol to mark it as variable
 	 */
 	private variable: BooleanProperty
+	/** length of the variable arrow relative to the default */
+	private variableLength: SliderProperty
 	private variableArrow: SVG.G
 
 	/**
@@ -250,6 +253,21 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 					this.update()
 				})
 				this.properties.add(PropertyCategories.options, this.variable)
+				this.variableLength = new SliderProperty(
+					"Arrow length",
+					0.3,
+					3,
+					0.05,
+					new SVG.Number(1),
+					true,
+					"Length of the arrow of a variable component, relative to the default",
+					"options:variableLength"
+				)
+				this.variableLength.addChangeListener((ev) => {
+					this.updateVariableArrow()
+					this.update()
+				})
+				this.properties.add(PropertyCategories.options, this.variableLength)
 				this.lineWidthProperty.addChangeListener((ev) => {
 					this.updateVariableArrow()
 					this.update()
@@ -646,7 +664,7 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 		// always at 45 degrees, like the arrow of the variable capacitor, centered on the symbol
 		const box = this.componentVariant.viewBox
 		// as long as on the variable capacitor, also on flat symbols like the european resistor
-		const half = Math.max(0.65 * Math.min(box.w, box.h), 21.3)
+		const half = Math.max(0.65 * Math.min(box.w, box.h), 21.3) * (this.variableLength?.value?.value ?? 1)
 		const cx = box.x + box.w / 2
 		const cy = box.y + box.h / 2
 		return [new SVG.Point(cx - half, cy + half), new SVG.Point(cx + half, cy - half)]
@@ -1050,6 +1068,7 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 
 		if (this.variable?.value) {
 			data.variable = true
+			if (this.variableLength.value.value != 1) data.variableLength = this.variableLength.value.value
 		}
 
 		if (this.blockSymbol) {
@@ -1202,6 +1221,7 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 
 		if (this.variable) {
 			this.variable.value = saveObject.variable ?? false
+			this.variableLength.value = new SVG.Number(saveObject.variableLength ?? 1)
 			this.updateVariableArrow()
 		}
 
