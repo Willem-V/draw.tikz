@@ -47,6 +47,9 @@ import {
 import { createSizeProperties, SizeProperties } from "../utils/sizeProperties"
 
 //TODO: add "line join" to poles, i.e. dot (.): this is essentially just a square with side length = line width (chapter 6.4 in documentation)
+/** default length of the variable arrow relative to the base length */
+const defaultVariableLength = 0.8
+
 /** passive symbols which get the same drawn 45 degree arrow as the sources, instead of the arrow of the circuitikz variable symbol */
 const variableCapable = new Set([
 	"american resistor",
@@ -258,7 +261,7 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 					0.3,
 					3,
 					0.05,
-					new SVG.Number(1),
+					new SVG.Number(defaultVariableLength),
 					true,
 					"Length of the arrow of a variable component, relative to the default",
 					"options:variableLength"
@@ -664,7 +667,7 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 		// always at 45 degrees, like the arrow of the variable capacitor, centered on the symbol
 		const box = this.componentVariant.viewBox
 		// as long as on the variable capacitor, also on flat symbols like the european resistor
-		const half = Math.max(0.65 * Math.min(box.w, box.h), 21.3) * (this.variableLength?.value?.value ?? 1)
+		const half = Math.max(0.65 * Math.min(box.w, box.h), 21.3) * (this.variableLength?.value?.value ?? defaultVariableLength)
 		const cx = box.x + box.w / 2
 		const cy = box.y + box.h / 2
 		return [new SVG.Point(cx - half, cy + half), new SVG.Point(cx + half, cy - half)]
@@ -1068,7 +1071,7 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 
 		if (this.variable?.value) {
 			data.variable = true
-			if (this.variableLength.value.value != 1) data.variableLength = this.variableLength.value.value
+			if (this.variableLength.value.value != defaultVariableLength) data.variableLength = this.variableLength.value.value
 		}
 
 		if (this.blockSymbol) {
@@ -1221,7 +1224,7 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 
 		if (this.variable) {
 			this.variable.value = saveObject.variable ?? false
-			this.variableLength.value = new SVG.Number(saveObject.variableLength ?? 1)
+			this.variableLength.value = new SVG.Number(saveObject.variableLength ?? defaultVariableLength)
 			this.updateVariableArrow()
 		}
 
