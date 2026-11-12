@@ -47,6 +47,17 @@ import {
 import { createSizeProperties, SizeProperties } from "../utils/sizeProperties"
 
 //TODO: add "line join" to poles, i.e. dot (.): this is essentially just a square with side length = line width (chapter 6.4 in documentation)
+/** passive symbols which get the same drawn 45 degree arrow as the sources, instead of the arrow of the circuitikz variable symbol */
+const variableCapable = new Set([
+	"american resistor",
+	"european resistor",
+	"generic",
+	"capacitor",
+	"cute inductor",
+	"american inductor",
+	"european inductor",
+])
+
 export type PoleEntry = { key: string; name: string; shortcut: string }
 export const poleChoices: PoleEntry[] = [
 	{ key: "none", name: "none", shortcut: "" },
@@ -143,7 +154,7 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 	private isBattery: boolean = false
 
 	/**
-	 * only available for sources: draws a diagonal arrow over the symbol to mark it as variable
+	 * only available for sources and the plain resistors, inductors and capacitors: draws a diagonal arrow over the symbol to mark it as variable
 	 */
 	private variable: BooleanProperty
 	private variableArrow: SVG.G
@@ -225,8 +236,8 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 		this.properties.add(PropertyCategories.options, this.poleStart)
 		this.properties.add(PropertyCategories.options, this.poleEnd)
 
-		// all voltage and current sources (incl. batteries) can be marked as variable
-		const canBeVariable = !!symbol.source
+		// all voltage and current sources (incl. batteries) and the plain resistors, inductors and capacitors can be marked as variable
+		const canBeVariable = !!symbol.source || variableCapable.has(symbol.tikzName)
 		if (symbol.possibleOptions.length > 0 || symbol.possibleEnumOptions.length > 0 || canBeVariable) {
 			this.properties.add(
 				PropertyCategories.options,
