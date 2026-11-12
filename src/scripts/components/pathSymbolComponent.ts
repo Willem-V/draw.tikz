@@ -645,7 +645,8 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 	private variableArrowPoints(): [SVG.Point, SVG.Point] {
 		// always at 45 degrees, like the arrow of the variable capacitor, centered on the symbol
 		const box = this.componentVariant.viewBox
-		const half = 0.65 * Math.min(box.w, box.h)
+		// as long as on the variable capacitor, also on flat symbols like the european resistor
+		const half = Math.max(0.65 * Math.min(box.w, box.h), 21.3)
 		const cx = box.x + box.w / 2
 		const cy = box.y + box.h / 2
 		return [new SVG.Point(cx - half, cy + half), new SVG.Point(cx + half, cy - half)]
