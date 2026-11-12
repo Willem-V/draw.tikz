@@ -164,6 +164,8 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 	/** length of the variable arrow relative to the default */
 	private variableLength: SliderProperty
 	private variableArrow: SVG.G
+	/** the stroke compensation the arrow was drawn with */
+	private variableArrowCompensation = 1
 
 	/**
 	 * only available for resizable blocks (see resizableBlocks): the size of the box (in units of 1.4cm, like circuitikz) and the text inside
@@ -713,9 +715,10 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 		const dir = end.sub(start).div(end.sub(start).abs())
 		const normal = new SVG.Point(-dir.y, dir.x)
 		// the arrow is transformed with the symbol, LaTeX keeps its line width when scaling
-		const strokeWidth = this.symbolStrokeWidth() * this.strokeCompensation()
+		this.variableArrowCompensation = this.strokeCompensation()
+		const strokeWidth = this.symbolStrokeWidth() * this.variableArrowCompensation
 		// approximately the size of the tikz "latex" arrow tip, which grows with the line width
-		const tipLength = 2.5 + 2.5 * strokeWidth
+		const tipLength = (2.5 + 2.5 * this.symbolStrokeWidth()) * this.variableArrowCompensation
 		const tipWidth = 0.75 * tipLength
 
 		this.variableArrow = CanvasController.instance.canvas.group()
@@ -835,6 +838,11 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 
 		let voltageConventionInvert = this.voltageConventionInvert() < 0
 		this.scaleState.x = Math.abs(this.scaleState.x) * (this.invert.value != voltageConventionInvert ? -1 : 1)
+
+		// the stroke of the arrow depends on the scale, so it has to be redrawn when the scale changed
+		if (this.variableArrow && this.variableArrowCompensation != this.strokeCompensation()) {
+			this.updateVariableArrow()
+		}
 
 		let m = this.getTransformMatrix()
 		this.componentVisualization.transform(m)
