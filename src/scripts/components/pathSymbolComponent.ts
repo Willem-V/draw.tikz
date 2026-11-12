@@ -629,15 +629,15 @@ export class PathSymbolComponent extends SymbolLineWidth(Currentable(Voltageable
 	}
 
 	/**
-	 * the start and end point of the variable arrow in local symbol coordinates: diagonally across the symbol from bottom left to top right, slightly overhanging
+	 * the start and end point of the variable arrow in local symbol coordinates: at 45 degrees from bottom left to top right, centered on the symbol
 	 */
 	private variableArrowPoints(): [SVG.Point, SVG.Point] {
+		// always at 45 degrees, like the arrow of the variable capacitor, centered on the symbol
 		const box = this.componentVariant.viewBox
-		const overhang = 0.15
-		return [
-			new SVG.Point(box.x - overhang * box.w, box.y2 + overhang * box.h),
-			new SVG.Point(box.x2 + overhang * box.w, box.y - overhang * box.h),
-		]
+		const half = 0.65 * Math.min(box.w, box.h)
+		const cx = box.x + box.w / 2
+		const cy = box.y + box.h / 2
+		return [new SVG.Point(cx - half, cy + half), new SVG.Point(cx + half, cy - half)]
 	}
 
 	/**
