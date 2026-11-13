@@ -27,6 +27,10 @@ export function splitCellLines(cell: string): string[] {
 		}
 	}
 	lines.push(current.trim())
+	// a `\\` at the end of the cell is a row terminator like in a tabular, not an empty extra line which would shift the text up
+	while (lines.length > 1 && lines[lines.length - 1] === "") {
+		lines.pop()
+	}
 	return lines
 }
 
